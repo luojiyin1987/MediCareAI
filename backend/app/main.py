@@ -17,7 +17,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.api.api_v1.api import api_router
 from app.core.config import settings
 from app.core.monitoring import PrometheusMiddleware, set_app_info
-from app.core.monitoring import PrometheusMiddleware, set_app_info
+
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -32,14 +32,16 @@ app = FastAPI(
     redoc_url="/redoc" if os.getenv("DEBUG") == "true" else None,
 )
 
+# CORS 配置：允许所有源
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,  # Use configured origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Platform"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
-
 
 app.add_middleware(
     TrustedHostMiddleware,

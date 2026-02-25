@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     ai_model_id: str = "unsloth/GLM-4.7-Flash-GGUF:BF16"
     
     # Embedding model settings (Qwen)
-    embedding_api_url: str = ""
+
     embedding_api_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     embedding_model_id: str = "text-embedding-v3"
     embedding_dimensions: int = 1024
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     oss_bucket: Optional[str] = None
     oss_endpoint: Optional[str] = None
     
-    cors_origins: List[str] = ["http://localhost:3000"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost", "http://127.0.0.1"]
     allowed_hosts: List[str] = ["localhost", "127.0.0.1"]
     
     debug: bool = False
