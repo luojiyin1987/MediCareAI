@@ -6,7 +6,7 @@ Email Service | 邮件服务
 - 密码重置邮件
 - 系统通知邮件
 
-使用异步任务队列发送邮件，避免阻塞主线程
+支持从环境变量或数据库动态配置读取SMTP设置
 """
 
 import smtplib
@@ -20,33 +20,102 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.models.models import User
+from app.models.models import User, EmailConfiguration
+from app.db.database import AsyncSessionLocal
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """邮件服务类 | Email Service Class"""
+    """邮件服务类 | Email Service Class
+
+    支持从环境变量或数据库动态配置读取SMTP设置
+    Supports reading SMTP settings from environment variables or database
+    """
 
     def __init__(self):
-        self.smtp_host = getattr(settings, "smtp_host", None)
-        self.smtp_port = getattr(settings, "smtp_port", 587)
-        self.smtp_user = getattr(settings, "smtp_user", None)
-        self.smtp_password = getattr(settings, "smtp_password", None)
-        self.from_email = getattr(settings, "smtp_from_email", None)
-        self.from_name = getattr(settings, "smtp_from_name", "MediCareAI")
-        self.use_tls = getattr(settings, "smtp_use_tls", True)
+        # 从环境变量读取配置（作为默认值）
+        self.env_smtp_host = getattr(settings, "smtp_host", None)
+        self.env_smtp_port = getattr(settings, "smtp_port", 587)
+        self.env_smtp_user = getattr(settings, "smtp_user", None)
+        self.env_smtp_password = getattr(settings, "smtp_password", None)
+        self.env_from_email = getattr(settings, "smtp_from_email", None)
+        self.env_from_name = getattr(settings, "smtp_from_name", "MediCareAI")
+        self.env_use_tls = getattr(settings, "smtp_use_tls", True)
 
-        # 检查邮件服务是否可用
+        # 当前使用的配置（会被动态配置覆盖）
+        self.smtp_host = self.env_smtp_host
+        self.smtp_port = self.env_smtp_port
+        self.smtp_user = self.env_smtp_user
+        self.smtp_password = self.env_smtp_password
+        self.from_email = self.env_from_email
+        self.from_name = self.env_from_name
+        self.use_tls = self.env_use_tls
+
+        self.is_available = False
+        self.config_source = "none"  # 'env', 'database', 'none'
+
+    async def load_config_from_db(self):
+        """
+        从数据库加载邮件配置 | Load email config from database
+
+        优先使用数据库中标记为默认且激活的配置
+        如果数据库中没有配置，则使用环境变量
+        """
+        try:
+            async with AsyncSessionLocal() as db:
+                # 查询默认且激活的配置
+                stmt = select(EmailConfiguration).where(
+                    EmailConfiguration.is_default == True,
+                    EmailConfiguration.is_active == True,
+                )
+                result = await db.execute(stmt)
+                config = result.scalar_one_or_none()
+
+                if config:
+                    # 使用数据库配置
+                    self.smtp_host = config.smtp_host
+                    self.smtp_port = config.smtp_port
+                    self.smtp_user = config.smtp_user
+                    self.smtp_password = config.smtp_password
+                    self.from_email = config.smtp_from_email
+                    self.from_name = config.smtp_from_name
+                    self.use_tls = config.smtp_use_tls
+                    self.config_source = "database"
+                    logger.info("Email configuration loaded from database")
+                else:
+                    # 使用环境变量配置
+                    self._use_env_config()
+
+        except Exception as e:
+            logger.warning(f"Failed to load email config from database: {e}")
+            # 回退到环境变量配置
+            self._use_env_config()
+
+    def _use_env_config(self):
+        """使用环境变量配置"""
+        self.smtp_host = self.env_smtp_host
+        self.smtp_port = self.env_smtp_port
+        self.smtp_user = self.env_smtp_user
+        self.smtp_password = self.env_smtp_password
+        self.from_email = self.env_from_email
+        self.from_name = self.env_from_name
+        self.use_tls = self.env_use_tls
+
+        if self.env_smtp_host and self.env_smtp_user and self.env_smtp_password:
+            self.config_source = "env"
+            logger.info("Email configuration loaded from environment variables")
+        else:
+            self.config_source = "none"
+            logger.warning("No email configuration available")
+
+    def check_availability(self) -> bool:
+        """检查邮件服务是否可用"""
         self.is_available = all(
             [self.smtp_host, self.smtp_user, self.smtp_password, self.from_email]
         )
-
-        if not self.is_available:
-            logger.warning(
-                "Email service not configured. Email functionality will be disabled."
-            )
+        return self.is_available
 
     async def send_email(
         self,
@@ -67,7 +136,12 @@ class EmailService:
         Returns:
             bool: 发送是否成功
         """
-        if not self.is_available:
+        # 确保配置已加载
+        if self.config_source == "none":
+            await self.load_config_from_db()
+
+        # 检查可用性
+        if not self.check_availability():
             logger.warning(
                 f"Email service not available. Would have sent email to {to_email}"
             )

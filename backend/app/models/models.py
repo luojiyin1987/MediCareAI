@@ -1707,5 +1707,149 @@ class ExtractedLabReport(Base):
 
 
 
+
+
+# =============================================================================
+# Email Configuration Model | 邮件配置模型
+# =============================================================================
+class EmailConfiguration(Base):
+    """
+    Email Configuration Model | 邮件配置模型
+    
+    存储SMTP邮件服务器配置，支持动态配置邮件服务
+    Stores SMTP server configuration for dynamic email service configuration
+    """
+    
+    __tablename__ = "email_configurations"
+    
+    # Primary Key | 主键
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique configuration identifier / 唯一配置标识符",
+    )
+    
+    # SMTP Configuration | SMTP配置
+    smtp_host = Column(
+        String(255),
+        nullable=False,
+        comment="SMTP server host / SMTP服务器地址",
+    )
+    
+    smtp_port = Column(
+        Integer,
+        nullable=False,
+        default=587,
+        comment="SMTP server port / SMTP服务器端口",
+    )
+    
+    smtp_user = Column(
+        String(255),
+        nullable=False,
+        comment="SMTP username / SMTP用户名",
+    )
+    
+    smtp_password = Column(
+        String(255),
+        nullable=False,
+        comment="SMTP password / SMTP密码",
+    )
+    
+    smtp_from_email = Column(
+        String(255),
+        nullable=False,
+        comment="From email address / 发件人邮箱地址",
+    )
+    
+    smtp_from_name = Column(
+        String(255),
+        nullable=False,
+        default="MediCareAI",
+        comment="From name / 发件人名称",
+    )
+    
+    smtp_use_tls = Column(
+        Boolean,
+        default=True,
+        comment="Use TLS encryption / 使用TLS加密",
+    )
+    
+    # Status | 状态
+    is_active = Column(
+        Boolean,
+        default=True,
+        comment="Configuration active status / 配置激活状态",
+    )
+    
+    is_default = Column(
+        Boolean,
+        default=False,
+        comment="Is default configuration / 是否为默认配置",
+    )
+    
+    # Test Status | 测试状态
+    test_status = Column(
+        String(50),
+        default="untested",
+        comment="Test status: untested, success, failed / 测试状态",
+    )
+    
+    test_message = Column(
+        Text,
+        nullable=True,
+        comment="Test result message / 测试结果消息",
+    )
+    
+    tested_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Last test time / 最后测试时间",
+    )
+    
+    # Metadata | 元数据
+    description = Column(
+        Text,
+        nullable=True,
+        comment="Configuration description / 配置描述",
+    )
+    
+    # Timestamps | 时间戳
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        comment="Creation time / 创建时间",
+    )
+    
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Update time / 更新时间",
+    )
+    
+    # Foreign Keys | 外键
+    created_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+        comment="Created by user ID / 创建者用户ID",
+    )
+    
+    # Indexes | 索引
+    __table_args__ = (
+        Index("idx_email_config_is_default", "is_default"),
+        Index("idx_email_config_is_active", "is_active"),
+    )
+    
+    # Relationships | 关系
+    creator = relationship("User", foreign_keys=[created_by])
+    
+    def __repr__(self):
+        return f"<EmailConfiguration(id={self.id}, host={self.smtp_host}, is_active={self.is_active})>"
+
+
+# Update __all__ list
+__all__.extend(["ExtractedLabReport", "EmailConfiguration"])
 # Update __all__ list
 __all__.extend(["ExtractedLabReport"])

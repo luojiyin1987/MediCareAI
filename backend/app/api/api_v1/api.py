@@ -13,6 +13,7 @@ from app.api.api_v1.endpoints import (
     chronic_diseases,
     monitoring,
     messages,
+    email_config,
 )
 from app.services.knowledge_base_service import router as knowledge_router
 
@@ -56,6 +57,11 @@ api_router.include_router(chronic_diseases.router, tags=["chronic-diseases"])
 
 # 管理员路由 (Admin only)
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+# 邮件配置路由 (Admin only)
+api_router.include_router(
+    email_config.router, prefix="/admin/email-config", tags=["email-configuration"]
+)
 
 # 监控指标路由
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
