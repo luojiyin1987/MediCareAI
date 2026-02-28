@@ -42,7 +42,6 @@
 - **🔐 用户认证与管理** - JWT 安全认证，用户注册登录，会话管理，支持患者、医生、管理员三端
 - **📧 邮箱验证系统** - 患者注册邮箱验证，确保邮箱有效性，支持一键验证链接
 - **👤 患者档案管理** - 完整的患者信息，病历号管理，紧急联系人，阿里云 OSS 安全存储患者病例资料
-- **👤 患者档案管理** - 完整的患者信息，病历号管理，紧急联系人，阿里云 OSS 安全存储患者病例资料
 - **🤖 AI 智能诊断** - 支持 OpenAI 兼容 API 的 AI 大模型，实时症状分析，结合患者历史病历和上传文档
 - **📄 文档智能处理** - MinerU 文档抽取，支持 PDF/图片/文档，自动 PII 脱敏保护隐私
 - **📊 医疗记录管理** - 病例管理，文档附件存储于阿里云 OSS，随访计划
@@ -50,7 +49,6 @@
 - **👨‍⚕️ 医生协作平台** - @医生提及系统，医患双向沟通，医生可在共享病例上添加专业评论
 - **📨 邮件通知系统** - 医生注册审核通知、审核通过/拒绝/撤销邮件，SMTP 动态配置
 - **🏛️ 管理员系统** - 系统监控(CPU/内存/磁盘)，医生认证审核，审计日志，知识库向量化管理，邮件服务配置
-- **🏛️ 管理员系统** - 系统监控(CPU/内存/磁盘)，医生认证审核，审计日志，知识库向量化管理
 
 <a name="overview-en"></a>
 ## 📖 Project Overview (English)
@@ -62,7 +60,6 @@
 - **🔐 User Authentication** - JWT secure auth, registration/login, session management, supports Patient/Doctor/Admin platforms
 - **📧 Email Verification** - Patient registration email verification to ensure email validity with one-click verification link
 - **👤 Patient Management** - Complete patient profiles, medical record numbers, emergency contacts, Alibaba Cloud OSS secure storage for patient case data
-- **👤 Patient Management** - Complete patient profiles, medical record numbers, emergency contacts, Alibaba Cloud OSS secure storage for patient case data
 - **🤖 AI Diagnosis** - Support for OpenAI-compatible API AI models, real-time symptom analysis, combines patient history and uploaded documents
 - **📄 Document Processing** - MinerU extraction, PDF/image/document support with automatic PII cleaning for privacy protection
 - **📊 Medical Records** - Case management, document attachments stored in Alibaba Cloud OSS, follow-up plans
@@ -70,7 +67,6 @@
 - **👨‍⚕️ Doctor Collaboration Platform** - @doctor mention system, bidirectional patient-doctor communication, doctors can add professional comments on shared cases
 - **📨 Email Notification System** - Doctor registration pending/approval/rejection/revocation notifications with SMTP dynamic configuration
 - **🏛️ Admin System** - System monitoring (CPU/Memory/Disk), doctor verification workflow, audit logging, knowledge base vectorization management, email service configuration
-- **🏛️ Admin System** - System monitoring (CPU/Memory/Disk), doctor verification workflow, audit logging, knowledge base vectorization management
 - **🔒 Privacy Protection** - Automatic PII detection and cleaning for document sharing
 
 ---
