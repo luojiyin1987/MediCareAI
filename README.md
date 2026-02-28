@@ -542,21 +542,20 @@ See [`.env.example`](.env.example) for full configuration template.
 
 #### System Documentation | 系统文档
 - **[🏗️ ARCHITECTURE.mdx](docs/ARCHITECTURE.mdx)** - System architecture & design / 系统架构与设计
-- **[🏗️ ARCHITECTURE.mdx](docs/ARCHITECTURE.mdx)** - System architecture & design / 系统架构与设计
 - **[🔌 API.mdx](docs/API.mdx)** - Complete API reference / 完整 API 参考
 - **[🤖 AI_ASSISTANT.mdx](docs/AI_ASSISTANT.mdx)** - AI assistant context / AI 助手上下文
 - **[🔍 RAG_OPTIMIZATION.mdx](docs/RAG_OPTIMIZATION.mdx)** - RAG optimization implementation / RAG优化实施文档（混合检索、HyDE、上下文压缩）
 
 #### Recent Updates & Fixes | 近期更新与修复
-- **[📊 DATA_EXPORT_FIX.mdx](docs/DATA_EXPORT_FIX.mdx)** - Data export fix summary / 数据导出修复总结（第一版 - 部分修复）
-- **[🤖 AI_ASSISTANT.mdx](docs/AI_ASSISTANT.mdx)** - AI assistant context / AI 助手上下文
+- **[📧 EMAIL_CONFIG_VERIFICATION.mdx](docs/EMAIL_CONFIG_VERIFICATION.mdx)** - Email service configuration / 邮件服务配置验证文档
+- **[📊 DATA_EXPORT_FIX.mdx](docs/DATA_EXPORT_FIX.mdx)** - Data export fix summary / 数据导出修复总结
+- **[📝 REGISTRATION_FIX.mdx](docs/REGISTRATION_FIX.mdx)** - Registration flow fixes / 注册流程修复文档
 
 #### Development & Maintenance | 开发与维护
 - **[🤝 CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines / 开发指南
 - **[📝 CHANGELOG.md](CHANGELOG.md)** - Full release history / 完整版本历史
 - **[🆘 TROUBLESHOOTING.mdx](docs/TROUBLESHOOTING.mdx)** - Troubleshooting & emergency fixes / 故障排除与应急修复
 - **[🧪 TESTING.mdx](docs/TESTING.mdx)** - Testing guide / 测试指南
-
 
 ### API Endpoints Overview | API 端点概览
 
