@@ -17,7 +17,7 @@ router = APIRouter()
 
 # 预设配置文件路径
 PROVIDERS_CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "email_providers.json"
+    os.path.dirname(__file__), "..", "..", "..", "data", "email_providers.json"
 )
 
 

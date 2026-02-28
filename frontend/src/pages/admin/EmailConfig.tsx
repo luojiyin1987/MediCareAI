@@ -109,11 +109,15 @@ const EmailConfigPage: React.FC = () => {
         adminApi.getEmailConfigs(),
         adminApi.getEmailServiceStatus(),
       ]);
-      setProviders(providersRes.providers);
-      setCategories(providersRes.categories);
-      setConfigs(configsRes.configs);
+      console.log('Email providers response:', providersRes);
+      console.log('Categories:', providersRes?.categories);
+      console.log('Providers:', providersRes?.providers);
+      setProviders(providersRes?.providers || []);
+      setCategories(providersRes?.categories || {});
+      setConfigs(configsRes?.configs || []);
       setServiceStatus(statusRes);
     } catch (err: any) {
+      console.error('Load data error:', err);
       setError(err.message || '加载数据失败');
     } finally {
       setLoading(false);
@@ -130,22 +134,23 @@ const EmailConfigPage: React.FC = () => {
         setIsCustom(true);
         setFormData(defaultFormData);
       } else {
-        setIsCustom(false);
-        // 自动填充配置
-        setFormData({
-          smtp_host: provider.smtp.host,
-          smtp_port: provider.smtp.port,
-          smtp_user: '',
-          smtp_password: '',
-          smtp_from_email: '',
-          smtp_from_name: 'MediCareAI',
-          smtp_use_tls: provider.smtp.useTLS,
-          description: provider.description,
-        });
-      }
+setIsCustom(false);
+// 自动填充配置
+setFormData({
+smtp_host: provider.smtp.host,
+smtp_port: provider.smtp.port,
+smtp_user: '',
+smtp_password: '',
+          smtp_from_email: '',  // 用户需要填写自己的邮箱地址
+smtp_from_name: 'MediCareAI',
+smtp_use_tls: provider.smtp.useTLS,
+description: provider.description,
+});
+}
     }
   };
 
+  // 保存配置
   // 保存配置
   const handleSave = async () => {
     setLoading(true);
@@ -153,11 +158,17 @@ const EmailConfigPage: React.FC = () => {
     setSuccess('');
 
     try {
+      // 添加 is_default 字段
+      const saveData = {
+        ...formData,
+        is_default: false, // 新配置默认不设为默认
+      };
+      
       if (editingConfig) {
-        await adminApi.updateEmailConfig(editingConfig.id, formData);
+        await adminApi.updateEmailConfig(editingConfig.id, saveData);
         setSuccess('配置更新成功');
       } else {
-        await adminApi.createEmailConfig(formData);
+        await adminApi.createEmailConfig(saveData);
         setSuccess('配置创建成功');
       }
       setOpenDialog(false);
@@ -338,24 +349,25 @@ const EmailConfigPage: React.FC = () => {
               </ListItemIcon>
               <ListItemText
                 primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle1">
+                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography component="span" variant="subtitle1">
                       {config.smtp_host}:{config.smtp_port}
                     </Typography>
                     {config.is_default && (
                       <Chip label="默认" color="success" size="small" />
-                    )}
+)}
                     {!config.is_active && (
                       <Chip label="已禁用" color="default" size="small" />
-                    )}
+)}
                   </Box>
                 }
                 secondary={
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      发件人: {config.smtp_from_name} &lt;{config.smtp_from_email}&gt;
+                  <Box component="span">
+                    <Typography component="span" variant="body2" color="text.secondary">
+                      发件人: {config.smtp_from_name} {'<'}{config.smtp_from_email}{'>'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <br />
+                    <Typography component="span" variant="caption" color="text.secondary">
                       测试状态:{' '}
                       {config.test_status === 'success' ? (
                         <span style={{ color: 'green' }}>✓ 通过</span>
@@ -422,7 +434,15 @@ const EmailConfigPage: React.FC = () => {
               <Typography variant="subtitle2" gutterBottom>
                 选择邮箱服务商（将自动填充配置）
               </Typography>
+              
+              {/* 显示错误提示 */}
+              {(!providers.length || !Object.keys(categories).length) && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  无法加载邮箱服务商列表，请检查网络连接或刷新页面重试
+                </Alert>
+              )}
 
+              {/* 国内主流 */}
               {/* 国内主流 */}
               {categories.domestic && (
                 <Accordion defaultExpanded>
@@ -601,7 +621,8 @@ const EmailConfigPage: React.FC = () => {
                 label="发件人邮箱"
                 value={formData.smtp_from_email}
                 onChange={(e) => setFormData({ ...formData, smtp_from_email: e.target.value })}
-                placeholder="如: noreply@medicare.ai"
+                placeholder="必须与SMTP用户名一致"
+                helperText="发件人邮箱必须与SMTP用户名相同，否则邮件会被拒绝"
               />
             </Grid>
             <Grid item xs={12} sm={6}>

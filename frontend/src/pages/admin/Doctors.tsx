@@ -172,7 +172,7 @@ const Doctors: React.FC = () => {
   // 拒绝医生认证
   const handleReject = async (id: string) => {
     try {
-      await adminApi.rejectDoctor(id);
+      await adminApi.rejectDoctor(id, '不符合认证要求');
       setSnackbar({
         open: true,
         message: '已拒绝认证',

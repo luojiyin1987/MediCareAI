@@ -27,14 +27,20 @@ import {
   Fade,
 } from '@mui/material';
 import {
+  Dashboard as DashboardIcon,
+  SmartToy as AiIcon,
+  MenuBook as KnowledgeBaseIcon,
+  LocalHospital as DoctorIcon,
+  Chat as MessageIcon,
+  Email as EmailIcon,
+  Article as AuditLogIcon,
   Person as PersonIcon,
-  MedicalServices as DoctorIcon,
+  MedicalServices as DoctorIcon2,
   PendingActions as PendingIcon,
   Description as CaseIcon,
   Computer as CpuIcon,
   Memory as MemoryIcon,
   Storage as DiskIcon,
-  SmartToy as AiIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
@@ -608,15 +614,15 @@ const Dashboard: React.FC = () => {
               onClick={() => navigate('/admin/ai-models')}
               sx={{ borderRadius: 2 }}
             >
-              配置AI模型
+              AI模型配置
             </Button>
             <Button
               variant="outlined"
-              startIcon={<DoctorIcon />}
+              startIcon={<KnowledgeBaseIcon />}
               onClick={() => navigate('/admin/knowledge-base')}
               sx={{ borderRadius: 2 }}
             >
-              管理知识库
+              知识库配置
             </Button>
             <Button
               variant="outlined"
@@ -624,15 +630,31 @@ const Dashboard: React.FC = () => {
               onClick={() => navigate('/admin/doctors')}
               sx={{ borderRadius: 2 }}
             >
-              审核医生认证
+              医生认证系统
             </Button>
             <Button
               variant="outlined"
-              startIcon={<CaseIcon />}
+              startIcon={<MessageIcon />}
+              onClick={() => navigate('/admin/internal-messages')}
+              sx={{ borderRadius: 2 }}
+            >
+              站内信
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<EmailIcon />}
+              onClick={() => navigate('/admin/email-config')}
+              sx={{ borderRadius: 2 }}
+            >
+              邮件服务配置
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<AuditLogIcon />}
               onClick={() => navigate('/admin/logs')}
               sx={{ borderRadius: 2 }}
             >
-              查看系统日志
+              审计日志
             </Button>
           </Box>
         </CardContent>

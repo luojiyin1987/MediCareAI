@@ -10,7 +10,168 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
 ---
+---
 
+## [3.0.5] - 2026-02-28
+
+### 邮件服务系统升级 | Email Service System Upgrade | 📧
+
+#### 患者邮箱验证系统 (Patient Email Verification System)
+- **实现患者注册邮箱验证** Implemented patient registration email verification
+  - `email_service.py`: 新增 `send_verification_email()` 方法，发送验证邮件
+  - `email_templates.py`: 新增患者注册验证邮件模板（HTML + 纯文本）
+  - 使用 32 位无连字符 UUID 作为验证 token，避免 URL 编码问题
+  - 验证链接 24 小时有效，支持一键验证
+  - `VerifyEmail.tsx`: 新增邮箱验证页面，处理验证链接
+
+#### 医生认证邮件通知系统 (Doctor Certification Email Notification System)
+- **医生注册审核通知** Doctor registration pending notification
+  - 医生注册后自动发送 "等待审核" 邮件
+  - 邮件内容包含审核说明和预计时间
+  
+- **医生审核通过通知** Doctor approval notification  
+  - 管理员审核通过后自动发送欢迎邮件
+  - 包含登录链接和平台功能介绍
+  
+- **医生认证状态变更通知** Doctor certification status change notifications
+  - 认证撤销时发送撤销通知邮件，说明原因
+  - 认证恢复时发送恢复通知邮件，包含登录链接
+  - `admin.py`: 在 `approve_doctor_verification`, `revoke_doctor_verification`, `reapprove_doctor_verification` 端点集成邮件发送
+
+#### SMTP 邮件服务动态配置 (Dynamic SMTP Email Configuration)
+- **管理员界面配置** Admin UI Configuration
+  - `EmailConfig.tsx`: 新增邮件服务配置页面
+  - 支持 SMTP 服务器设置（主机、端口、用户名、密码）
+  - 支持发件人信息配置（名称、邮箱）
+  - 支持 SSL/TLS 加密选项
+  - 邮件发送测试功能
+
+- **数据库存储配置** Database Configuration Storage
+  - `email_service.py`: 新增 `load_config_from_db()` 方法
+  - 邮件配置存储在 `email_configurations` 表
+  - 支持多套配置，可设置默认配置
+  - 配置变更实时生效，无需重启服务
+
+#### 首次登录引导优化 (First Login Guidance Optimization)
+- **完善个人信息引导** Complete Profile Guidance
+  - `AuthContext.tsx`: 新增首次登录检测逻辑
+  - 使用 `localStorage` 标记 `has_seen_profile_completion` 避免重复引导
+  - 仅首次登录时跳转到完善信息页面
+  - 后续登录直接跳转到主页
+
+- **完善信息页面** Complete Profile Page
+  - `CompleteProfile.tsx`: 新增三步骤引导页面
+  - 步骤1：邮箱验证
+  - 步骤2：完善个人信息（地址、电话）
+  - 步骤3：完成引导
+
+### Bug 修复 Bug Fixes | 🐛
+
+#### 邮件发送修复
+- **修复邮件配置加载问题** Fixed email config loading issue
+  - 患者注册和医生注册时自动加载邮件配置
+  - 添加 `config_source == "none"` 检查
+  
+- **修复重复邮件发送问题** Fixed duplicate email sending
+  - 患者注册时只发送一封验证邮件
+  - 删除重复的 `load_config_from_db()` 调用
+  
+- **修复医生审核拒绝功能** Fixed doctor rejection functionality
+  - 前端添加 `reason` 参数支持
+  - 后端设置默认拒绝理由
+
+#### 代码优化 Code Optimization
+- **删除重复导入** Removed duplicate imports
+  - `auth.py`: 统一顶部导入 `os`, `logging`, `settings`, `temail_service`
+  - `admin.py`: 添加 `_send_doctor_notification()` 统一邮件发送函数
+  - `email_templates.py`: 统一顶部导入，删除函数内重复导入
+
+### 新增文件 Added Files
+- `frontend/src/pages/auth/VerifyEmail.tsx` - 邮箱验证页面
+- `frontend/src/pages/patient/CompleteProfile.tsx` - 完善个人信息页面
+- `frontend/src/pages/admin/EmailConfig.tsx` - 邮件服务配置页面
+- `backend/app/services/email_templates.py` - 邮件模板服务
+- `docs/EMAIL_CONFIG_VERIFICATION.mdx` - 邮件配置验证文档
+- `docs/REGISTRATION_FIX.mdx` - 注册修复文档
+
+### 变更 Changed
+- `backend/app/services/email_service.py` - 添加邮件配置数据库加载
+- `backend/app/api/api_v1/endpoints/auth.py` - 集成邮箱验证发送
+- `backend/app/api/api_v1/endpoints/admin.py` - 集成医生认证邮件通知
+- `frontend/src/contexts/AuthContext.tsx` - 添加首次登录检测
+- `frontend/src/services/api.ts` - 添加邮件配置 API
+
+---
+
+## [3.0.4] - 2026-02-26
+
+### RAG 优化实施 | RAG Optimization | 🔍
+
+#### 混合检索实现 (Hybrid Search Implementation)
+- **实现混合检索功能** Implemented hybrid search functionality
+  - `kb_vectorization_service.py`: 添加 `hybrid_search()` 方法，支持向量+全文搜索
+  - 使用 RRF (Reciprocal Rank Fusion) 算法融合两种搜索结果
+  - 可配置权重：vector_weight (默认0.7), keyword_weight (默认0.3)
+  - 支持元数据过滤：疾病分类、来源类型、文档标题
+
+#### PostgreSQL 全文搜索支持 (Full-Text Search Support)
+- **数据库层面支持全文搜索** Database-level full-text search support
+  - `models.py`: 添加 `search_vector` 列 (TSVECTOR 类型) 到 `knowledge_base_chunks` 表
+  - 创建 GIN 索引 `idx_kb_chunks_search_vector` 加速搜索
+  - 创建复合索引支持元数据过滤查询
+  - 新增迁移文件 `002_add_fulltext_search_to_kb.py`
+
+#### HyDE 查询增强 (HyDE Query Enhancement)
+- **实现 HyDE (Hypothetical Document Embeddings)** Implemented HyDE for query expansion
+  - `rag_enhancement_service.py`: 新增服务，提供查询增强功能
+  - 使用现有 LLM 生成假设性答案文档，改善检索质量
+  - 支持查询改写：扩展医学缩写、添加同义词
+  - 自动提取 5-8 个相关医学关键词
+
+#### 上下文压缩 (Context Compression)
+- **实现上下文压缩功能** Implemented context compression
+  - 使用 LLM 从检索结果中提取与查询相关的内容
+  - 生成关键要点列表，保留源引用信息
+  - 减少 LLM 调用时的 token 消耗 (~30%)
+
+#### API 端点扩展 (API Endpoints Extension)
+- **扩展知识库搜索 API** Extended knowledge base search API
+  - `POST /knowledge-base/search`: 支持混合检索、HyDE、元数据过滤
+  - `POST /knowledge-base/enhance-query`: 查询增强预览端点
+  - `POST /knowledge-base/compress`: 上下文压缩端点
+
+#### 前端 API 更新 (Frontend API Updates)
+- **更新前端 API 服务** Updated frontend API service
+  - `api.ts`: 添加 `searchKnowledgeBase()`, `enhanceSearchQuery()`, `compressKbResults()` 方法
+  - 完整类型定义支持新参数
+
+### 文档更新 Documentation Updates | 📝
+
+#### 新增 RAG 优化文档
+- **创建 `docs/RAG_OPTIMIZATION.mdx`**: RAG优化实施总结文档
+  - 实施概览和修改文件清单
+  - 核心功能详解（混合检索、元数据过滤、HyDE、上下文压缩）
+  - 数据库变更说明
+  - 部署步骤和 API 使用示例
+  - 性能优化预期和监控指标
+
+#### 新增数据导出修复文档
+- **创建 `docs/DATA_EXPORT_FIX.mdx`**: 数据导出修复总结文档
+  - 问题描述和根本原因分析（代码重复导致AI数据被覆盖）
+  - 三套数据提取逻辑的详细说明
+  - 修复方案和代码变更（删除重复提取逻辑）
+  - 验证步骤和问题排查指南
+
+### Bug 修复 Bug Fixes | 🐛
+
+#### 数据导出检验数据丢失修复
+- **修复医生端CSV导出时检验数据为空的问题** Fixed empty lab data in doctor CSV export
+  - `doctor.py`: 删除重复的数据提取逻辑（3套→1套）
+  - 确保AI提取的检验数据不再被症状/诊断文本提取覆盖
+  - 数据提取优先级：AI结构化数据 > 文档文本提取 > 不提取
+  - 修复后CSV应包含70+个检验指标的实际数值
+
+---
 ## [3.0.4] - 2026-02-26
 
 ### RAG 优化实施 | RAG Optimization | 🔍

@@ -95,6 +95,34 @@ from app.schemas.admin import (
     UpdateSystemSettingsResponse,
     SystemConfiguration,
 )
+from app.services.email_templates import (
+    send_doctor_approval_email,
+    send_doctor_revocation_email,
+    send_doctor_reapproval_email,
+)
+from app.core.config import settings
+
+
+router = APIRouter()
+
+
+async def _send_doctor_notification(
+    email_func, user, *args, action_name: str = "操作"
+) -> bool:
+    """统一的医生邮件通知发送函数"""
+    try:
+        logger.info(f"准备发送医生{action_name}邮件到 {user.email}")
+        email_sent = await email_func(user.email, user.full_name, *args)
+        if email_sent:
+            logger.info(f"✅ 医生{action_name}邮件已发送至 {user.email}")
+        else:
+            logger.warning(f"⚠️ 医生{action_name}邮件发送失败: {user.email}")
+        return email_sent
+    except Exception as e:
+        logger.error(f"❌ 发送医生{action_name}邮件失败: {e}")
+        logger.exception("详细错误:")
+        return False
+
 
 router = APIRouter()
 
@@ -434,7 +462,15 @@ async def approve_doctor_verification(
         )
 
     await db.commit()
+    # 发送医生审核通过邮件
+    if user:
+        login_url = f"{settings.frontend_url}/login"
+        await _send_doctor_notification(
+            send_doctor_approval_email, user, login_url,
+            action_name="审核通过"
+        )
 
+    # Log admin operation
     # Log admin operation
     admin_logger = AdminOperationLogger(db)
     await admin_logger.log_operation(
@@ -460,7 +496,7 @@ async def approve_doctor_verification(
 class DoctorRejectionRequest(BaseModel):
     """Doctor rejection request | 医生拒绝请求"""
 
-    reason: str
+    reason: str = "不符合认证要求 / Does not meet certification requirements"
 
 
 @router.post("/doctors/verifications/{verification_id}/reject")
@@ -579,8 +615,14 @@ async def revoke_doctor_verification(
         user.is_verified = False
         user.is_verified_doctor = False
 
-    await db.commit()
+    # 发送医生认证撤销邮件
+    if user:
+        await _send_doctor_notification(
+            send_doctor_revocation_email, user, revoke_req.reason,
+            action_name="认证撤销"
+        )
 
+    # Log admin operation
     # Log admin operation
     admin_logger = AdminOperationLogger(db)
     await admin_logger.log_operation(
@@ -649,8 +691,15 @@ async def reapprove_doctor_verification(
         user.is_verified_doctor = True
         user.is_verified = True
 
-    await db.commit()
+    # 发送医生认证恢复邮件
+    if user:
+        login_url = f"{settings.frontend_url}/login"
+        await _send_doctor_notification(
+            send_doctor_reapproval_email, user, login_url, notes,
+            action_name="认证恢复"
+        )
 
+    # Log admin operation
     # Log admin operation
     admin_logger = AdminOperationLogger(db)
     await admin_logger.log_operation(

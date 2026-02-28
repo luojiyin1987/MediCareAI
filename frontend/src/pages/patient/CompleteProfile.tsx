@@ -37,9 +37,19 @@ const CompleteProfilePage: React.FC = () => {
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
+    // 如果用户已经访问过完善信息页面（无论是否实际填写），不再强制跳转
+    const hasSeenProfileCompletion = localStorage.getItem('has_seen_profile_completion');
+    
+    // 如果用户已经完成引导流程，直接跳转到首页
+    if (hasSeenProfileCompletion) {
+      navigate('/patient');
+      return;
+    }
+    
     // 如果用户已经验证过邮箱且信息完整，直接跳转到首页
     if (user?.is_verified && user?.address && user?.phone) {
       navigate('/patient');
+      return;
     }
     
     // 设置当前步骤
@@ -105,8 +115,11 @@ const CompleteProfilePage: React.FC = () => {
 
   // 完成引导
   const handleComplete = () => {
+    // 标记用户已完成引导流程
+    localStorage.setItem('has_seen_profile_completion', 'true');
     navigate('/patient');
   };
+
 
   return (
     <Box

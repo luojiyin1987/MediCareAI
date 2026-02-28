@@ -222,7 +222,12 @@ export const authApi = {
       },
     });
   },
+  
+  sendVerificationEmail: () => api.post('/auth/send-verification-email'),
+  
+  verifyEmail: (token: string) => api.get(`/auth/verify-email?token=${token}`),
 };
+
 
 export const casesApi = {
   getCases: () => api.get<MedicalCase[]>('/medical-cases'),
@@ -441,7 +446,7 @@ export const adminApi = {
   getDoctorVerifications: (status?: string) => api.get<{ verifications: DoctorVerification[] }>('/admin/doctors/verifications', 
     status ? { params: { status } } : {}),
   approveDoctor: (id: string) => api.post<void>(`/admin/doctors/verifications/${id}/approve`),
-  rejectDoctor: (id: string) => api.post<void>(`/admin/doctors/verifications/${id}/reject`),
+  rejectDoctor: (id: string, reason?: string) => api.post<void>(`/admin/doctors/verifications/${id}/reject`, { reason }),
   revokeDoctor: (id: string, reason?: string) => api.post<void>(`/admin/doctors/verifications/${id}/revoke`, { reason }),
   reapproveDoctor: (id: string, notes?: string) => api.post<void>(`/admin/doctors/verifications/${id}/reapprove`, { notes }),
   getDoctorVerificationDetail: (id: string) => api.get<{
@@ -563,26 +568,27 @@ export const adminApi = {
     formatted_url: string;
   }>('/admin/embedding/validate-url', { url }),
   changePassword: (current_password: string, new_password: string) =>
-  // Email Provider APIs
+    api.post('/auth/change-password', { current_password, new_password }),
+
   getEmailProviderPresets: () => api.get<{
     providers: EmailProviderPreset[];
     categories: Record<string, ProviderCategory>;
-  }>(""/admin/email-providers/presets"),
+  }>("/admin/email-providers/presets"),
 
-  getEmailProviderPreset: (providerId: string) => api.get<EmailProviderPreset>(`"/admin/email-providers/presets/${providerId}"`),
+  getEmailProviderPreset: (providerId: string) => api.get<EmailProviderPreset>(`/admin/email-providers/presets/${providerId}`),
 
   // Email Config APIs
-  getEmailConfigs: () => api.get<{ configs: EmailConfig[]; total: number }>(""/admin/email-config/configs"),
+  getEmailConfigs: () => api.get<{ configs: EmailConfig[]; total: number }>("/admin/email-config/configs"),
 
-  createEmailConfig: (data: EmailConfigCreate) => api.post<EmailConfig>(""/admin/email-config/configs"),
+  createEmailConfig: (data: EmailConfigCreate) => api.post<EmailConfig>("/admin/email-config/configs", data),
 
-  updateEmailConfig: (id: string, data: EmailConfigUpdate) => api.put<EmailConfig>(`"/admin/email-config/configs/${id}"`),
+  updateEmailConfig: (id: string, data: EmailConfigUpdate) => api.put<EmailConfig>(`/admin/email-config/configs/${id}`, data),
 
-  deleteEmailConfig: (id: string) => api.delete<void>(`"/admin/email-config/configs/${id}"`),
+  deleteEmailConfig: (id: string) => api.delete<void>(`/admin/email-config/configs/${id}`),
 
-  testEmailConfig: (id: string, testEmail: string) => api.post<{ success: boolean; message: string }>(`"/admin/email-config/configs/${id}/test"`, { test_email: testEmail }),
+  testEmailConfig: (id: string, testEmail: string) => api.post<{ success: boolean; message: string }>(`/admin/email-config/configs/${id}/test`, { test_email: testEmail }),
 
-  setDefaultEmailConfig: (id: string) => api.post<EmailConfig>(`"/admin/email-config/configs/${id}/set-default"`),
+  setDefaultEmailConfig: (id: string) => api.post<EmailConfig>(`/admin/email-config/configs/${id}/set-default`),
 
   getEmailServiceStatus: () => api.get<{
     is_available: boolean;
@@ -593,8 +599,7 @@ export const adminApi = {
     from_email?: string;
     from_name?: string;
     use_tls?: boolean;
-  }>(""/admin/email-config/status"),
-    api.post<void>('/admin/change-password', { current_password, new_password }),
+  }>("/admin/email-config/status"),
 };
 
 export const chronicDiseasesApi = {

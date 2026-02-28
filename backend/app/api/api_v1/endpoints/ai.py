@@ -1141,6 +1141,3 @@ async def test_ai_connection():
 
 # 导入 datetime 用于生成 case_id
 from datetime import datetime
-import logging
-
-logger = logging.getLogger(__name__)

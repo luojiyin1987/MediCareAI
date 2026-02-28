@@ -2,12 +2,17 @@
 认证 API 端点 - 用户认证、注册、个人信息管理
 """
 
+import os
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from typing import Optional, Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr, Field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import uuid
 
 from app.db.database import get_db
 from app.schemas.user import UserLogin, UserCreate, UserResponse, UserUpdate
@@ -15,8 +20,12 @@ from app.services.user_service import UserService
 from app.core.deps import get_current_active_user
 from app.models.models import User
 from app.core.i18n import get_message
-
-import logging
+from app.core.config import settings
+from app.services.email_service import temail_service
+from app.services.email_templates import (
+    send_doctor_pending_email,
+    send_doctor_approval_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +96,31 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             # 患者档案创建失败不阻止注册成功
             logger.warning(f"患者档案创建失败（非阻塞）: {e}")
 
-    # 3. 返回成功信息（不返回登录令牌，不自动登录）
+    # 3. 发送验证邮件
+    try:
+        # 确保邮件配置已加载
+        if temail_service.config_source == "none":
+            await temail_service.load_config_from_db()
+
+            token = await temail_service.send_verification_email(db, user, settings.frontend_url)
+            if token:
+                logger.info(f"✅ 验证邮件已发送至 {user.email}, token: {token}")
+            else:
+                logger.error(f"❌ 验证邮件发送失败，token 为 None")
+        else:
+            logger.warning("⚠️ 邮件服务不可用，跳过发送验证邮件")
+    except Exception as e:
+        logger.error(f"发送验证邮件失败: {e}")
+        logger.exception("详细错误:")
+        # 邮件发送失败不阻止注册成功
+
+    # 4. 返回成功信息（不返回登录令牌，不自动登录）
     return {
-        "message": "注册成功，请登录",
+        "message": "注册成功，请查收验证邮件完成邮箱验证",
         "user_id": str(user.id),
         "email": user.email,
     }
+
 class LoginRequest(BaseModel):
     """Login request with optional platform parameter / 带可选平台参数的登录请求"""
 
@@ -157,8 +185,6 @@ async def refresh_token(
     刷新访问令牌
     Refresh access token using refresh token
     """
-    from app.core.security import verify_token, create_token_for_user
-    from app.core.config import settings
     import jwt
 
     try:
@@ -511,8 +537,6 @@ async def register_doctor(
     Supports uploading multiple license documents.
     """
     from datetime import datetime
-    import os
-    from app.core.config import settings
     from app.models.models import DoctorVerification
 
     user_service = UserService(db)
@@ -615,6 +639,23 @@ async def register_doctor(
             f"医生注册成功: {email}, 上传了 {len(uploaded_files_info)} 个证书文件, 等待审核"
         )
 
+        # 发送待审核通知邮件
+        try:
+            # 确保邮件配置已加载
+            if temail_service.config_source == "none":
+                await temail_service.load_config_from_db()
+
+            if temail_service.check_availability():
+                await send_doctor_pending_email(email, full_name)
+                logger.info(f"✅ 医生待审核通知邮件已发送至 {email}")
+            else:
+                logger.warning("⚠️ 邮件服务不可用，跳过发送待审核通知邮件")
+        except Exception as e:
+            logger.error(f"发送医生待审核通知邮件失败: {e}")
+            # 邮件发送失败不阻止注册成功
+
+
+
         return user
     except Exception as e:
         logger.error(f"医生注册失败: {e}")
@@ -704,12 +745,28 @@ async def verify_doctor(
 
     logger.info(f"医生已审核通过: {doctor.email} (by {current_user.email})")
 
+    # 发送审核通过通知邮件
+    try:
+        login_url = f"{settings.frontend_url}/login"
+        logger.info(f"准备发送医生审核通过邮件到 {doctor.email}, login_url={login_url}")
+        email_sent = await send_doctor_approval_email(doctor.email, doctor.full_name, login_url)
+        if email_sent:
+            logger.info(f"✅ 医生审核通过通知邮件已发送至 {doctor.email}")
+        else:
+            logger.warning(f"⚠️ 医生审核通过通知邮件发送失败，返回False: {doctor.email}")
+    except Exception as e:
+        logger.error(f"❌ 发送医生审核通过通知邮件失败: {e}")
+        logger.exception("详细错误堆栈:")
+        # 邮件发送失败不阻止审核流程
+
+
     return {
         "message": "医生审核通过",
         "doctor_id": str(doctor_id),
         "doctor_name": doctor.full_name,
         "verified_by": current_user.full_name,
     }
+
 
 
 @router.get("/admin/pending-doctors")
@@ -765,8 +822,6 @@ async def send_verification_email(
     - 生成验证token并发送到用户邮箱
     - 限制发送频率（1分钟内只能发送一次）
     """
-    from app.services.email_service import temail_service
-    from app.core.config import settings
     
     # 检查是否已经验证
     if current_user.is_verified:
@@ -777,7 +832,10 @@ async def send_verification_email(
     
     # 检查发送频率限制（1分钟内只能发送一次）
     if current_user.email_verification_sent_at:
-        time_since_last_send = datetime.utcnow() - current_user.email_verification_sent_at
+        sent_at = current_user.email_verification_sent_at
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        time_since_last_send = datetime.now(timezone.utc) - sent_at
         if time_since_last_send < timedelta(minutes=1):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -815,12 +873,25 @@ async def verify_email(
     """
     from sqlalchemy import select
     
+    logger.info(f"收到验证请求，token: {token}")
+    
+    # 清理token（去除首尾空格）
+    token = token.strip() if token else token
+    logger.info(f"清理后的token: {token}")
+    
     # 查找用户
     stmt = select(User).where(User.email_verification_token == token)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     
+    logger.info(f"查询结果: user={user is not None}, token={token}")
+    
     if not user:
+        # 查询数据库中所有有token的用户，用于调试
+        all_stmt = select(User.email, User.email_verification_token).where(User.email_verification_token.isnot(None))
+        all_result = await db.execute(all_stmt)
+        all_users = all_result.all()
+        logger.info(f"数据库中有token的用户: {[(u.email, u.email_verification_token) for u in all_users]}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="无效的验证链接 / Invalid verification link"
@@ -828,7 +899,10 @@ async def verify_email(
     
     # 检查token是否过期（24小时）
     if user.email_verification_sent_at:
-        time_since_sent = datetime.utcnow() - user.email_verification_sent_at
+        sent_at = user.email_verification_sent_at
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        time_since_sent = datetime.now(timezone.utc) - sent_at
         if time_since_sent > timedelta(hours=24):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -837,7 +911,7 @@ async def verify_email(
     
     # 更新用户验证状态
     user.is_verified = True
-    user.email_verified_at = datetime.utcnow()
+    user.email_verified_at = datetime.now(timezone.utc)
     user.email_verification_token = None
     
     await db.commit()
@@ -861,8 +935,6 @@ async def forgot_password(
     - 无论邮箱是否存在都返回成功（防止邮箱枚举攻击）
     """
     from sqlalchemy import select
-    from app.services.email_service import temail_service
-    from app.core.config import settings
     
     # 查找用户
     stmt = select(User).where(User.email == email)
@@ -877,7 +949,10 @@ async def forgot_password(
     
     # 检查发送频率限制（5分钟内只能发送一次）
     if user.password_reset_sent_at:
-        time_since_last_send = datetime.utcnow() - user.password_reset_sent_at
+        sent_at = user.password_reset_sent_at
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        time_since_last_send = datetime.now(timezone.utc) - sent_at
         if time_since_last_send < timedelta(minutes=5):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -930,7 +1005,10 @@ async def reset_password(
     
     # 检查token是否过期（1小时）
     if user.password_reset_sent_at:
-        time_since_sent = datetime.utcnow() - user.password_reset_sent_at
+        sent_at = user.password_reset_sent_at
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        time_since_sent = datetime.now(timezone.utc) - sent_at
         if time_since_sent > timedelta(hours=1):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

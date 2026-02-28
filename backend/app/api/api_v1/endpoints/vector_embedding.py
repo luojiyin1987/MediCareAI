@@ -15,14 +15,6 @@ from app.models.models import User
 import uuid
 
 logger = logging.getLogger(__name__)
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-from app.db.database import get_db
-from app.services.vector_embedding_service import VectorEmbeddingService
-from app.services.kb_vectorization_service import KnowledgeBaseVectorizationService
-from app.core.deps import get_current_active_user
-from app.models.models import User
-import uuid
 
 router = APIRouter()
 

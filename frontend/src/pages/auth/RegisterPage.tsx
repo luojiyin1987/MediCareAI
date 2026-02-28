@@ -39,10 +39,6 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { CONFIG } from '../../lib/config';
 import { AddressSelect } from '../../components/common/AddressSelect';
 import type { RegisterData } from '../../types';
-import { useNavigate } from 'react-router-dom';
-import { useAuthContext } from '../../contexts/AuthContext';
-import { CONFIG } from '../../lib/config';
-import type { RegisterData } from '../../types';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -73,7 +69,7 @@ const RegisterPage: React.FC = () => {
       phone: '',
       gender: '',
       date_of_birth: '',
-      address: '',
+      address: { province: '', city: '', district: '', detail: '' },
       emergency_contact_name: '',
       emergency_contact_phone: '',
       confirmPassword: '',
@@ -85,27 +81,6 @@ const RegisterPage: React.FC = () => {
       terms: false,
     },
   });
-    defaultValues: {
-      role: 'patient',
-      full_name: '',
-      email: '',
-      password: '',
-      phone: '',
-      gender: '',
-      date_of_birth: '',
-      address: '',
-      emergency_contact_name: '',
-      emergency_contact_phone: '',
-      confirmPassword: '',
-      title: '',
-      department: '',
-      hospital: '',
-      license_number: '',
-      specialty: '',
-      terms: false,
-    },
-  });
-
   const password = watch('password');
   const confirmPassword = watch('confirmPassword');
 
@@ -127,11 +102,11 @@ const RegisterPage: React.FC = () => {
     // 构建完整地址字符串
     let fullAddress = '';
     if (address && typeof address === 'object') {
-      fullAddress = address.fullAddress || '';
+      const { province, city, district, detail } = address;
+      fullAddress = `${province || ''}${city || ''}${district || ''}${detail || ''}`.trim();
     } else if (typeof address === 'string') {
       fullAddress = address;
     }
-    const { confirmPassword, emergency_contact_name, emergency_contact_phone, ...registerData } = data;
 
     if (data.role === 'patient' && emergency_contact_name && emergency_contact_phone) {
       registerData.emergency_contact = `${emergency_contact_name} (${emergency_contact_phone})`;
@@ -446,33 +421,27 @@ const RegisterPage: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <AddressSelect
-                      value={{
-                        province: field.value?.province || '',
-                        city: field.value?.city || '',
-                        district: field.value?.district || '',
-                        detail: field.value?.detail || field.value || '',
-                      }}
-                      onChange={(address) => field.onChange(address.fullAddress)}
+                      value={
+                        typeof field.value === 'string' 
+                          ? { province: '', city: '', district: '', detail: field.value || '' }
+                          : {
+                              province: field.value?.province || '',
+                              city: field.value?.city || '',
+                              district: field.value?.district || '',
+                              detail: field.value?.detail || '',
+                            }
+                      }
+                      onChange={(address) => field.onChange({
+                        province: address.province,
+                        city: address.city,
+                        district: address.district,
+                        detail: address.detail,
+                      })}
                       disabled={isSubmitting || isLoading}
                     />
                   )}
                 />
               </Grid>
-                <Controller
-                  name="address"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="地址"
-                      placeholder="请输入地址（可选）"
-                      disabled={isSubmitting || isLoading}
-                    />
-                  )}
-                />
-              </Grid>
-
               <Grid item xs={12} sm={6}>
                 <Controller
                   name="emergency_contact_name"

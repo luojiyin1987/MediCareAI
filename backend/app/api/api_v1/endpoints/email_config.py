@@ -348,12 +348,14 @@ async def test_email_config(
         MediCareAI 智能疾病管理系统
         """
 
-        success = await temail_service.send_email(
+        logger.info(f"Testing email config {config_id}: sending to {test_data.test_email}")
+        success, error_msg = await temail_service.send_email(
             to_email=test_data.test_email,
             subject="【MediCareAI】邮件配置测试 / Email Configuration Test",
             html_content=html_content,
             text_content=text_content,
         )
+        logger.info(f"Email send result: success={success}, error={error_msg}")
 
         if success:
             # 更新配置测试状态
@@ -366,12 +368,15 @@ async def test_email_config(
                 f"Email config test passed for {config_id} by {current_user.email}"
             )
 
-            return EmailConfigTestResponse(
+            response = EmailConfigTestResponse(
                 success=True,
                 message=f"测试邮件发送成功 / Test email sent successfully to {test_data.test_email}",
             )
+            logger.info(f"Returning success response: {response}")
+            return response
         else:
-            raise Exception("邮件发送失败")
+            logger.error(f"Email send failed: {error_msg}")
+            raise Exception(error_msg or "邮件发送失败")
 
     except Exception as e:
         # 更新配置测试状态

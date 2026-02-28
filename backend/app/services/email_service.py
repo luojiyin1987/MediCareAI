@@ -10,6 +10,8 @@ Email Service | 邮件服务
 """
 
 import smtplib
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
@@ -123,7 +125,7 @@ class EmailService:
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
-    ) -> bool:
+    ) -> tuple[bool, Optional[str]]:
         """
         发送邮件 | Send Email
 
@@ -141,11 +143,17 @@ class EmailService:
             await self.load_config_from_db()
 
         # 检查可用性
+        logger.info(f"邮件服务配置: host={self.smtp_host}, port={self.smtp_port}, user={self.smtp_user}, from={self.from_email}")
         if not self.check_availability():
             logger.warning(
                 f"Email service not available. Would have sent email to {to_email}"
             )
-            return False
+            return False, None
+        if not self.check_availability():
+            logger.warning(
+                f"Email service not available. Would have sent email to {to_email}"
+            )
+            return False, None
 
         try:
             msg = MIMEMultipart("alternative")
@@ -160,19 +168,40 @@ class EmailService:
             # 添加HTML版本
             msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-            # 连接SMTP服务器并发送
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                if self.use_tls:
-                    server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.sendmail(self.from_email, to_email, msg.as_string())
+            # 在后台线程中执行同步的SMTP操作，避免阻塞事件循环
+            loop = asyncio.get_event_loop()
 
-            logger.info(f"Email sent successfully to {to_email}")
-            return True
+            def send_sync():
+                try:
+                    # 根据端口选择 SSL 或 STARTTLS
+                    if self.smtp_port == 465:
+                        # SSL/TLS 连接 (如 QQ邮箱、163邮箱)
+                        with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=10) as server:
+                            server.login(self.smtp_user, self.smtp_password)
+                            server.sendmail(self.from_email, to_email, msg.as_string())
+                    else:
+                        # STARTTLS 连接 (如 Gmail、Outlook)
+                        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
+                            if self.use_tls:
+                                server.starttls()
+                            server.login(self.smtp_user, self.smtp_password)
+                            server.sendmail(self.from_email, to_email, msg.as_string())
+                    return True, None
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"SMTP error: {error_msg}")
+                    return False, error_msg
+
+            success, error_msg = await loop.run_in_executor(None, send_sync)
+
+            if success:
+                logger.info(f"Email sent successfully to {to_email}")
+            return success, error_msg
 
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Failed to send email to {to_email}: {error_msg}")
+            return False, error_msg
 
     async def send_verification_email(
         self, db: AsyncSession, user: User, base_url: str
@@ -188,13 +217,27 @@ class EmailService:
         Returns:
             str: 验证token，失败返回None
         """
-        # 生成验证token
-        verification_token = str(uuid.uuid4())
+        # 重新从数据库获取用户对象，确保它在当前会话中
+        from sqlalchemy import select
+        stmt = select(User).where(User.id == user.id)
+        result = await db.execute(stmt)
+        db_user = result.scalar_one_or_none()
+        
+        if not db_user:
+            logger.error(f"无法找到用户 {user.id} 来发送验证邮件")
+            return None
+        
+        # 生成验证token (使用无连字符格式，避免URL编码问题)
+        verification_token = uuid.uuid4().hex  # 32位十六进制，无连字符
 
         # 保存token到用户记录
-        user.email_verification_token = verification_token
-        user.email_verification_sent_at = datetime.utcnow()
+        db_user.email_verification_token = verification_token
+        from datetime import timezone
+        db_user.email_verification_sent_at = datetime.now(timezone.utc)
         await db.commit()
+        await db.refresh(db_user)  # 刷新对象状态确保数据已持久化
+        logger.info(f"✅ Token saved to DB: user_id={db_user.id}, token={verification_token}")
+        logger.info(f"准备发送验证邮件到: {db_user.email}, base_url: {base_url}")
 
         # 构建验证链接
         verification_url = f"{base_url}/verify-email?token={verification_token}"
@@ -223,7 +266,7 @@ class EmailService:
                     <h2>Email Verification</h2>
                 </div>
                 <div class="content">
-                    <p>尊敬的 {user.full_name}，您好！</p>
+                    <p>尊敬的 {db_user.full_name}，您好！</p>
                     <p>感谢您注册 MediCareAI 智能疾病管理系统。为了确保您的账户安全，请验证您的邮箱地址。</p>
                     <p>Dear {user.full_name}, thank you for registering with MediCareAI. Please verify your email address to secure your account.</p>
                     
@@ -250,7 +293,7 @@ class EmailService:
         text_content = f"""
         MediCareAI 邮箱验证
         
-        尊敬的 {user.full_name}，您好！
+        尊敬的 {db_user.full_name}，您好！
         
         感谢您注册 MediCareAI 智能疾病管理系统。请验证您的邮箱地址：
         
@@ -261,11 +304,12 @@ class EmailService:
         MediCareAI 智能疾病管理系统
         """
 
-        success = await self.send_email(user.email, subject, html_content, text_content)
+        success, error_msg = await self.send_email(db_user.email, subject, html_content, text_content)
 
         if success:
             return verification_token
         else:
+            logger.error(f"Failed to send verification email: {error_msg}")
             return None
 
     async def send_password_reset_email(
@@ -282,8 +326,9 @@ class EmailService:
         Returns:
             str: 重置token，失败返回None
         """
-        # 生成重置token
-        reset_token = str(uuid.uuid4())
+        # 生成重置token (使用无连字符格式)
+        reset_token = uuid.uuid4().hex
+
 
         # 保存token到用户记录
         user.password_reset_token = reset_token
@@ -356,11 +401,12 @@ class EmailService:
         MediCareAI 智能疾病管理系统
         """
 
-        success = await self.send_email(user.email, subject, html_content, text_content)
+        success, error_msg = await self.send_email(user.email, subject, html_content, text_content)
 
         if success:
             return reset_token
         else:
+            logger.error(f"Failed to send password reset email: {error_msg}")
             return None
 
 

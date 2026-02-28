@@ -35,33 +35,41 @@
 <a name="overview-zh"></a>
 ## 📖 项目概述 (中文) | Project Overview
 
-**MediCareAI** 是一个基于人工智能的智能疾病管理系统，专为患者随访和疾病追踪设计。系统整合了医疗指南、AI 智能诊断和文档处理功能，为医疗机构提供全面的健康支持。
+|**MediCareAI** 是一个基于人工智能的智能疾病管理系统，专为患者随访和疾病追踪设计。系统整合了医疗指南、AI 智能诊断、文档处理功能和完整的邮件通知系统，为医疗机构提供全面的健康支持。
 
 ### 🎯 核心功能
 
 - **🔐 用户认证与管理** - JWT 安全认证，用户注册登录，会话管理，支持患者、医生、管理员三端
+- **📧 邮箱验证系统** - 患者注册邮箱验证，确保邮箱有效性，支持一键验证链接
+- **👤 患者档案管理** - 完整的患者信息，病历号管理，紧急联系人，阿里云 OSS 安全存储患者病例资料
 - **👤 患者档案管理** - 完整的患者信息，病历号管理，紧急联系人，阿里云 OSS 安全存储患者病例资料
 - **🤖 AI 智能诊断** - 支持 OpenAI 兼容 API 的 AI 大模型，实时症状分析，结合患者历史病历和上传文档
 - **📄 文档智能处理** - MinerU 文档抽取，支持 PDF/图片/文档，自动 PII 脱敏保护隐私
 - **📊 医疗记录管理** - 病例管理，文档附件存储于阿里云 OSS，随访计划
 - **🏥 知识库系统** - 基于向量检索的智能知识库(RAG)，管理员可动态创建医疗指南，AI 诊断自动引用循证医学建议
 - **👨‍⚕️ 医生协作平台** - @医生提及系统，医患双向沟通，医生可在共享病例上添加专业评论
+- **📨 邮件通知系统** - 医生注册审核通知、审核通过/拒绝/撤销邮件，SMTP 动态配置
+- **🏛️ 管理员系统** - 系统监控(CPU/内存/磁盘)，医生认证审核，审计日志，知识库向量化管理，邮件服务配置
 - **🏛️ 管理员系统** - 系统监控(CPU/内存/磁盘)，医生认证审核，审计日志，知识库向量化管理
 
 <a name="overview-en"></a>
 ## 📖 Project Overview (English)
 
-**MediCareAI** is an intelligent disease management system powered by AI, designed for patient follow-up and disease tracking. It combines medical guidelines, AI-powered diagnosis, and document processing to provide comprehensive healthcare support.
+|**MediCareAI** is an intelligent disease management system powered by AI, designed for patient follow-up and disease tracking. It combines medical guidelines, AI-powered diagnosis, document processing, and comprehensive email notification system to provide comprehensive healthcare support.
 
 ### 🎯 Core Features
 
 - **🔐 User Authentication** - JWT secure auth, registration/login, session management, supports Patient/Doctor/Admin platforms
+- **📧 Email Verification** - Patient registration email verification to ensure email validity with one-click verification link
+- **👤 Patient Management** - Complete patient profiles, medical record numbers, emergency contacts, Alibaba Cloud OSS secure storage for patient case data
 - **👤 Patient Management** - Complete patient profiles, medical record numbers, emergency contacts, Alibaba Cloud OSS secure storage for patient case data
 - **🤖 AI Diagnosis** - Support for OpenAI-compatible API AI models, real-time symptom analysis, combines patient history and uploaded documents
 - **📄 Document Processing** - MinerU extraction, PDF/image/document support with automatic PII cleaning for privacy protection
 - **📊 Medical Records** - Case management, document attachments stored in Alibaba Cloud OSS, follow-up plans
 - **🏥 Knowledge Base** - Vector-based intelligent knowledge base (RAG), admins can dynamically create medical guidelines, AI diagnosis automatically references evidence-based recommendations
 - **👨‍⚕️ Doctor Collaboration Platform** - @doctor mention system, bidirectional patient-doctor communication, doctors can add professional comments on shared cases
+- **📨 Email Notification System** - Doctor registration pending/approval/rejection/revocation notifications with SMTP dynamic configuration
+- **🏛️ Admin System** - System monitoring (CPU/Memory/Disk), doctor verification workflow, audit logging, knowledge base vectorization management, email service configuration
 - **🏛️ Admin System** - System monitoring (CPU/Memory/Disk), doctor verification workflow, audit logging, knowledge base vectorization management
 - **🔒 Privacy Protection** - Automatic PII detection and cleaning for document sharing
 

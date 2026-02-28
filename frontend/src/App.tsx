@@ -18,6 +18,7 @@ import PlatformSelect from './pages/auth/PlatformSelect';
 import DoctorLoginPage from './pages/auth/DoctorLoginPage';
 import DoctorRegister from './pages/auth/DoctorRegister';
 import AdminLoginPage from './pages/auth/AdminLoginPage';
+import VerifyEmailPage from './pages/auth/VerifyEmail';
 
 import PatientLayout from './components/layout/PatientLayout';
 import PatientDashboard from './pages/patient/Dashboard';
@@ -109,6 +110,7 @@ function App() {
                   <Route path="/doctor-login" element={<DoctorLoginPage />} />
                   <Route path="/doctor-register" element={<DoctorRegister />} />
                   <Route path="/admin-login" element={<AdminLoginPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
                   
                   <Route element={<ProtectedRoute allowedRoles={['patient']} />}>
                     <Route path="/patient" element={<PatientLayout />}>

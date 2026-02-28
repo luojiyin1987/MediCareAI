@@ -20,6 +20,8 @@ python /app/init_db.py
 echo "Running database migrations..."
 python /app/migrations/add_license_document_columns.py
 python /app/migrations/add_internal_messages_table.py
+python /app/app/migrations/versions/003_add_email_verification_fields.py
+python /app/app/migrations/versions/004_add_email_configuration.py
 
 echo "Initializing admin account..."
 python /app/init_admin.py
