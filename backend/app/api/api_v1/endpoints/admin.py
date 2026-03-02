@@ -191,6 +191,7 @@ async def get_dashboard_summary(
             "total_requests": ai_stats.get("total_requests", 0),
             "success_rate": ai_stats.get("success_rate", 0),
             "average_latency_ms": ai_stats.get("average_latency_ms", 0),
+            "tokens_used": ai_stats.get("tokens_used", 0),
             "anomalies": ai_stats.get("anomalies", 0),
         },
         "user_statistics": {

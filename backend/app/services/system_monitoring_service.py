@@ -253,6 +253,11 @@ class SystemMonitoringService:
         latencies = [l.request_duration_ms for l in logs if l.request_duration_ms]
         avg_latency = sum(latencies) / len(latencies) if latencies else 0
         
+        # Token usage statistics
+        total_tokens_input = sum([l.tokens_input for l in logs if l.tokens_input])
+        total_tokens_output = sum([l.tokens_output for l in logs if l.tokens_output])
+        total_tokens_used = total_tokens_input + total_tokens_output
+        
         # Status breakdown
         status_breakdown = {}
         for log in logs:
@@ -268,9 +273,40 @@ class SystemMonitoringService:
             "anomalies": anomalies,
             "success_rate": round(successful / total_requests * 100, 2) if total_requests > 0 else 0,
             "average_latency_ms": round(avg_latency, 2),
+            "tokens_used": total_tokens_used,
+            "tokens_input": total_tokens_input,
+            "tokens_output": total_tokens_output,
             "status_breakdown": status_breakdown
         }
     
+    async def detect_anomalies(
+        self,
+        hours: int = 1
+    ) -> List[Dict[str, Any]]:
+        """Detect AI diagnosis anomalies / 检测AI诊断异常"""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        
+        stmt = select(AIDiagnosisLog).where(
+            AIDiagnosisLog.timestamp >= since,
+            AIDiagnosisLog.is_anomaly == True
+        )
+        
+        result = await self.db.execute(stmt)
+        anomalies = result.scalars().all()
+        
+        return [
+            {
+                "id": str(log.id),
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                "user_id": str(log.user_id) if log.user_id else None,
+                "request_type": log.request_type,
+                "status": log.status,
+                "duration_ms": log.request_duration_ms,
+                "error_message": log.error_message,
+                "anomaly_reason": log.anomaly_reason
+            }
+            for log in anomalies
+        ]
     async def detect_anomalies(
         self,
         hours: int = 1
