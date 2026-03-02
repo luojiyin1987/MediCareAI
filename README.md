@@ -366,12 +366,12 @@ nano .env  # 编辑配置
 sudo apt-get install certbot
 
 # 申请证书 (standalone 模式，需要临时停止占用 80 端口的服务)
-sudo certbot certonly --standalone -d openmedicareai.life
+sudo certbot certonly --standalone -d your-domain.com
 
 # 复制证书到项目目录
 sudo mkdir -p docker/nginx/ssl
-sudo cp /etc/letsencrypt/live/openmedicareai.life/fullchain.pem docker/nginx/ssl/cert.pem
-sudo cp /etc/letsencrypt/live/openmedicareai.life/privkey.pem docker/nginx/ssl/key.pem
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/nginx/ssl/cert.pem
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/nginx/ssl/key.pem
 
 # 设置正确权限 (重要!)
 sudo chown $USER:$USER docker/nginx/ssl/*
@@ -432,10 +432,10 @@ sudo ufw enable
 
 | 平台 | HTTP 地址 | HTTPS 地址 | 说明 |
 |------|----------|-----------|------|
-| **患者端** | http://openmedicareai.life | https://openmedicareai.life | 主平台 |
-| **医生端** | http://openmedicareai.life:8081 | https://openmedicareai.life:8443 | 医生专用 |
-| **管理员端** | http://openmedicareai.life:8080 | https://openmedicareai.life:8444 | 后台管理 |
-| **API 文档** | - | https://openmedicareai.life/api/docs | Swagger UI |
+| **患者端** | http://your-domain.com | https://your-domain.com | 主平台 |
+| **医生端** | http://your-domain.com:8081 | https://your-domain.com:8443 | 医生专用 |
+| **管理员端** | http://your-domain.com:8080 | https://your-domain.com:8444 | 后台管理 |
+| **API 文档** | - | https://your-domain.com/api/docs | Swagger UI |
 
 ### Default Admin Account | 默认管理员账号
 
