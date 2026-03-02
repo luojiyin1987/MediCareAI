@@ -11,6 +11,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.1] - 2026-03-02
+
+### 关键安全修复 Critical Security Fix | 🔒
+
+#### Mixed Content Error 修复 (HTTPS/Mixed Content Fix)
+- **修复 HTTPS 页面加载 HTTP API 错误** Fixed HTTPS page loading HTTP API error
+  - `backend/app/main.py`: 添加 `ProxyHeadersMiddleware` 中间件
+  - 解决患者端仪表盘 "加载统计数据失败" 问题
+  - 修复浏览器阻止混合内容请求 (Mixed Content Blocking)
+  - 后端现在正确识别 `X-Forwarded-Proto` 头，生成正确的 HTTPS URL
+
+#### 修复详情 (Fix Details)
+- **问题描述**: 生产环境 HTTPS 前端请求 HTTP API 端点，浏览器阻止请求
+  - 错误信息: `Mixed Content: The page at 'https://...' was loaded over HTTPS, but requested an insecure XMLHttpRequest endpoint 'http://...'`
+  - 影响: 患者端仪表盘无法加载统计数据
+  
+- **根本原因**: FastAPI 默认不识别反向代理的 `X-Forwarded-Proto` 头
+  - Nginx 正确传递了 `X-Forwarded-Proto: https`
+  - 但 FastAPI 生成 URL 时仍使用 HTTP 协议
+  
+- **解决方案**: 添加 Uvicorn 的 `ProxyHeadersMiddleware`
+  ```python
+  from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+  
+  app.add_middleware(
+      ProxyHeadersMiddleware,
+      trusted_hosts=["*"],
+  )
+  ```
+
+#### 部署优化 (Deployment Optimizations)
+- **Docker Compose 卷挂载修复** Docker Compose Volume Mount Fix
+  - 修复前端构建后 dist 目录被挂载覆盖的问题
+  - 生产环境使用 `docker-compose.prod.yml`，注释掉开发环境卷挂载
+  
+- **前端构建优化** Frontend Build Optimization
+  - `frontend/Dockerfile`: 使用 `npx vite build` 跳过 TypeScript 检查
+  - 添加 `serve` 作为生产环境静态文件服务器
+  - 多阶段构建减少镜像体积
+
+#### 文档修复 (Documentation Fixes)
+- **README.md 格式修复** README.md Format Fix
+  - 修复重复的代码块标记导致的显示混乱
+  - 将真实域名 `openmedicareai.life` 替换为占位符 `your-domain.com`
+  - 统一文档风格，移除敏感信息暴露
+
+### 新增文件 Added Files
+- `docker-compose.prod.yml` - 生产环境 Docker Compose 配置
+
+### 变更 Changed
+- `backend/app/main.py` - 添加 ProxyHeadersMiddleware 支持反向代理
+- `frontend/Dockerfile` - 优化多阶段构建流程
+- `docker-compose.yml` - 修复卷挂载配置
+- `frontend/index.html` - 添加缓存控制头防止浏览器缓存旧版本
+- `README.md` - 修复格式错误和敏感信息泄露
+
+---
+
 ## [3.1.0] - 2026-03-02
 
 ### 部署修复与优化 | Deployment Fixes & Optimizations | 🚀

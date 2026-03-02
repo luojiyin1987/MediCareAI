@@ -298,6 +298,68 @@ server {
 }
 ```
 
+### 3. 反向代理配置 | Reverse Proxy Configuration
+
+当使用 Nginx 作为反向代理时，必须配置后端应用以识别转发的协议头。这是**防止 Mixed Content Error 的关键配置**。
+
+#### 配置 ProxyHeadersMiddleware | Configure ProxyHeadersMiddleware
+
+编辑 `backend/app/main.py`:
+
+```python
+from fastapi import FastAPI
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+app = FastAPI()
+
+# 添加 ProxyHeadersMiddleware 以信任 Nginx 传递的 X-Forwarded-* 头
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["*"],  # 生产环境应指定具体的 Nginx 容器 IP 或主机名
+)
+
+# 其他中间件...
+```
+
+**重要提示 | Important Notes**:
+- `ProxyHeadersMiddleware` 必须**尽早添加**，在其他中间件之前
+- 此配置确保 FastAPI 正确识别 `X-Forwarded-Proto: https` 头
+- 防止后端生成 HTTP URL 导致的 Mixed Content 错误
+- 生产环境应将 `trusted_hosts` 限制为具体的可信主机
+
+#### Nginx 配置验证 | Nginx Configuration Verification
+
+确保 Nginx 正确传递协议头:
+
+```nginx
+location /api/ {
+    proxy_pass http://backend:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;  # 关键: 传递协议类型
+    
+    # 超时配置
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+}
+```
+
+#### 常见问题 | Common Issues
+
+**Mixed Content Error**:
+```
+Mixed Content: The page at 'https://...' was loaded over HTTPS, 
+but requested an insecure XMLHttpRequest endpoint 'http://...'
+```
+
+**解决方案**: 确保同时配置了:
+1. Nginx: `proxy_set_header X-Forwarded-Proto $scheme;`
+2. FastAPI: `ProxyHeadersMiddleware` 中间件
+
+---
+
 ---
 
 <a name="database-configuration"></a>

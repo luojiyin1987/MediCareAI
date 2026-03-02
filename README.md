@@ -405,7 +405,39 @@ sleep 20
 # 验证状态
 docker compose ps
 curl https://localhost/health --insecure
+curl https://localhost/health --insecure
 ```
+
+#### Step 6: Reverse Proxy Configuration | 步骤 6: 反向代理配置 (重要!)
+
+当使用 Nginx 作为反向代理时，需要确保后端正确识别 HTTPS 协议，**否则会出现 Mixed Content Error**。
+
+**Verify ProxyHeadersMiddleware is configured**:
+
+确保 `backend/app/main.py` 包含以下配置:
+
+```python
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+app = FastAPI()
+
+# 必须添加此中间件以支持反向代理
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["*"],  # 生产环境应限制为具体的主机
+)
+```
+
+**此配置的作用**:
+- 让 FastAPI 正确识别 `X-Forwarded-Proto: https` 头
+- 防止后端生成 HTTP URL 导致的 Mixed Content 错误
+- 确保患者端仪表盘等页面能正常加载数据
+
+**故障排除**: 如果遇到 "加载统计数据失败" 或 Mixed Content 错误，请参考:
+- [TROUBLESHOOTING.mdx](docs/TROUBLESHOOTING.mdx) - Issue 8
+- [PRODUCTION_DEPLOYMENT.mdx](docs/PRODUCTION_DEPLOYMENT.mdx) - 反向代理配置章节
+
+---
 
 #### Step 5: Firewall Configuration | 步骤 5: 防火墙配置
 

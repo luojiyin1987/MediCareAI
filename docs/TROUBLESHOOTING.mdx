@@ -665,6 +665,102 @@ ls -la docker/nginx/ssl/
 
 ---
 
+### Issue 8: Mixed Content Error - HTTPS Page Loading HTTP API | 混合内容错误 - HTTPS 页面加载 HTTP API
+
+**Symptoms | 现象**:
+```
+Mixed Content: The page at 'https://your-domain.com/patient' was loaded over HTTPS, 
+but requested an insecure XMLHttpRequest endpoint 'http://your-domain.com/api/v1/patients/'
+```
+- 患者端仪表盘显示 "加载统计数据失败"
+- 浏览器控制台显示混合内容错误
+- API 请求被浏览器阻止
+
+**Diagnosis | 诊断**:
+- Nginx 正确配置了 `X-Forwarded-Proto` 头
+- 但 FastAPI 后端默认不识别反向代理头
+- 后端生成 URL 时仍使用 HTTP 协议而非 HTTPS
+
+**Root Cause | 根本原因**:
+FastAPI 应用缺少 `ProxyHeadersMiddleware`，无法识别 Nginx 传递的 `X-Forwarded-Proto` 头信息。
+
+**Solution | 解决方案**:
+
+1. **Add ProxyHeadersMiddleware** (已修复 | Already Fixed in v3.1.1):
+
+编辑 `backend/app/main.py`:
+```python
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+app = FastAPI(...)
+
+# Add ProxyHeadersMiddleware to trust X-Forwarded-* headers from Nginx
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["*"],  # In production, specify actual Nginx container IP
+)
+```
+
+2. **Verify Nginx Configuration**:
+
+确保 `docker/nginx/nginx-ssl.conf` 包含:
+```nginx
+location /api/ {
+    proxy_pass http://backend;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Host $host;
+    # ...
+}
+```
+
+3. **Rebuild and Restart Backend**:
+
+```bash
+# Pull latest code with fix
+git pull
+
+# Rebuild backend image
+docker compose build --no-cache backend
+
+# Restart backend service
+docker compose up -d backend
+
+# Verify the fix
+docker compose logs backend --tail=20
+```
+
+**Verification | 验证**:
+
+```bash
+# Test API endpoint
+curl -s -o /dev/null -w "%{http_code}" https://your-domain.com/api/v1/patients/
+# Should return: 403 (authentication required, not a protocol error)
+
+# Check no mixed content errors in browser
+# Open https://your-domain.com/patient
+# Open DevTools > Console
+# Should see no "Mixed Content" errors
+```
+
+**Prevention | 预防措施**:
+
+When deploying behind a reverse proxy, always add `ProxyHeadersMiddleware`:
+
+```python
+# For production with specific trusted hosts
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["medicare_nginx", "localhost", "your-domain.com"],
+)
+```
+
+---
+
+**Last Updated | 最后更新**: 2026-03-02  
+**Version | 版本**: v3.1.1  
+**Maintainer | 维护者**: MediCareAI Team
+
 **Last Updated | 最后更新**: 2026-03-02  
 **Version | 版本**: v2.1.0  
 **Maintainer | 维护者**: MediCareAI Team
