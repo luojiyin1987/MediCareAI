@@ -175,6 +175,156 @@ API_KEY_MASTER_KEY=$(openssl rand -base64 32)
 <a name="cors-configuration"></a>
 ## 🔒 CORS 配置 | CORS Configuration
 
+### 环境变量配置方式（推荐）| Environment Variable Configuration (Recommended)
+
+**代码已实现自动从环境变量读取配置，无需修改 main.py！**
+
+#### 1. 配置环境变量 | Configure Environment Variables
+
+编辑 `.env` 文件（生产环境）或 `.env.production`：
+
+```bash
+# =============================================================================
+# CORS 跨域配置 | CORS Cross-Origin Configuration
+# =============================================================================
+# ⚠️ 生产环境必须配置此项，否则API将无法从浏览器访问！
+# ⚠️ Production MUST configure this, or API won't be accessible from browsers!
+#
+# 格式：JSON数组格式
+# Format: JSON array format
+
+# 本地开发环境 | Local Development:
+CORS_ORIGINS=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080", "http://localhost:8081"]
+
+# 生产环境示例 | Production Example:
+# CORS_ORIGINS=["https://openmedicareai.life", "https://www.openmedicareai.life"]
+```
+
+#### 2. 配置允许的主机头 | Configure Allowed Host Headers
+
+```bash
+# =============================================================================
+# 允许的主机头 | Allowed Host Headers
+# =============================================================================
+# 用于防止 Host Header 攻击
+# Used to prevent Host Header attacks
+#
+# 格式：JSON数组格式
+# Format: JSON array format
+
+# 本地开发环境 | Local Development:
+ALLOWED_HOSTS=["localhost", "127.0.0.1", "*"]
+
+# 生产环境示例 | Production Example:
+# ALLOWED_HOSTS=["openmedicareai.life", "www.openmedicareai.life"]
+```
+
+#### 3. 配置信任的代理主机 | Configure Trusted Proxy Hosts
+
+```bash
+# =============================================================================
+# 信任的代理主机 | Trusted Proxy Hosts
+# =============================================================================
+# 用于正确识别 X-Forwarded-* 头（特别是 X-Forwarded-Proto: https）
+# Used to correctly identify X-Forwarded-* headers (especially X-Forwarded-Proto: https)
+# 这对于防止 Mixed Content Error 至关重要！
+# This is CRITICAL for preventing Mixed Content Error!
+#
+# 格式：JSON数组格式
+# Format: JSON array format
+
+# 本地开发环境 | Local Development:
+TRUSTED_PROXY_HOSTS=["*"]
+
+# 生产环境示例 | Production Example:
+# 限制为 Docker 网络和本地网络
+# TRUSTED_PROXY_HOSTS=["nginx", "127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+```
+
+### 配置验证 | Configuration Verification
+
+配置完成后，验证后端是否正确读取配置：
+
+```bash
+# 进入后端容器
+ docker-compose exec backend bash
+
+# 检查环境变量
+echo $CORS_ORIGINS
+echo $ALLOWED_HOSTS
+echo $TRUSTED_PROXY_HOSTS
+
+# 测试 CORS 配置
+curl -H "Origin: https://your-domain.com" \
+     -H "Access-Control-Request-Method: POST" \
+     -H "Access-Control-Request-Headers: Content-Type" \
+     -X OPTIONS \
+     https://your-domain.com/api/v1/health
+```
+
+### 常见问题 | Common Issues
+
+#### 问题 1：CORS 错误仍然存在
+**症状：** 浏览器控制台显示 CORS policy error
+
+**原因：**
+1. 环境变量未正确设置
+2. 使用了错误的域名格式
+3. 缺少 `https://` 前缀
+
+**解决方案：**
+```bash
+# 检查环境变量是否生效
+docker-compose exec backend env | grep CORS
+
+# 重启后端服务以重新加载配置
+docker-compose restart backend
+
+# 验证配置格式（必须是有效的JSON数组）
+# 正确：["https://domain.com"]
+# 错误：https://domain.com
+# 错误：["https://domain.com",]  # 末尾逗号
+```
+
+#### 问题 2：Mixed Content Error
+**症状：**
+```
+Mixed Content: The page at 'https://...' was loaded over HTTPS,
+but requested an insecure XMLHttpRequest endpoint 'http://...'
+```
+
+**原因：**
+1. `TRUSTED_PROXY_HOSTS` 未配置，导致后端无法识别 HTTPS 请求
+2. Nginx 未正确传递 `X-Forwarded-Proto: https` 头
+
+**解决方案：**
+```bash
+# 1. 确保 .env 中配置了 TRUSTED_PROXY_HOSTS
+TRUSTED_PROXY_HOSTS=["nginx", "127.0.0.1"]
+
+# 2. 确保 Nginx 配置正确
+docker-compose exec nginx nginx -t
+
+# 3. 重启所有服务
+docker-compose restart
+```
+
+#### 问题 3：Host Header 攻击警告
+**症状：** 日志中出现 `Invalid host` 错误
+
+**原因：** `ALLOWED_HOSTS` 未包含实际访问的域名
+
+**解决方案：**
+```bash
+# 检查实际访问的域名
+docker-compose logs backend | grep "Invalid host"
+
+# 将域名添加到 ALLOWED_HOSTS
+ALLOWED_HOSTS=["your-domain.com", "www.your-domain.com"]
+```
+
+---
+
 ### 修改 backend/app/core/config.py
 
 ```python

@@ -478,6 +478,73 @@ sudo ufw enable
 
 ⚠️ **安全提示 | Security Notice:** 请在首次登录后立即修改密码！
 
+### First-Time Deployment Configuration | 首次部署配置
+
+**⚠️ 重要提示：现在需要手动配置管理员密码 | IMPORTANT: Manual admin password configuration now required**
+
+由于安全加固，我们已经移除了 docker-compose.yml 中的硬编码密码。首次部署时，你需要：
+
+#### 1. 设置数据库密码 | Set Database Password
+
+编辑 `.env` 文件，设置强密码：
+
+```bash
+# PostgreSQL 密码（至少16位，包含大小写字母、数字和特殊字符）
+POSTGRES_PASSWORD=YourStrongPassword123!
+
+# Redis 密码
+REDIS_PASSWORD=YourRedisPassword456!
+```
+
+#### 2. 配置安全设置 | Configure Security Settings
+
+根据你的部署环境配置以下变量：
+
+**本地开发环境 | Local Development:**
+```bash
+# 允许所有来源（仅开发环境）
+CORS_ORIGINS=["*"]
+ALLOWED_HOSTS=["*"]
+TRUSTED_PROXY_HOSTS=["*"]
+DEBUG=true
+ENV=development
+```
+
+**生产环境 | Production Environment:**
+```bash
+# 只允许特定域名（必须修改为你的实际域名）
+CORS_ORIGINS=["https://your-domain.com", "https://admin.your-domain.com", "https://doctor.your-domain.com"]
+ALLOWED_HOSTS=["your-domain.com", "admin.your-domain.com", "doctor.your-domain.com"]
+TRUSTED_PROXY_HOSTS=["nginx", "127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+DEBUG=false
+ENV=production
+```
+
+#### 3. 创建管理员账号 | Create Admin Account
+
+系统首次启动时会自动创建默认管理员账号：
+- **邮箱:** `admin@medicare.ai`
+- **密码:** `admin123456`
+
+**首次登录后必须立即：**
+1. 登录管理员后台
+2. 进入「系统设置」→「管理员管理」
+3. 修改默认密码
+4. 配置 AI 模型参数
+5. 配置邮件服务（用于发送医生审核通知）
+
+#### 4. 启动应用 | Start Application
+
+```bash
+# 开发环境
+docker-compose up -d
+
+# 生产环境
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+---
+
 ---
 
 ## 🏗️ Architecture | 系统架构
