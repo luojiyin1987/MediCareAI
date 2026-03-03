@@ -99,7 +99,8 @@ from app.services.email_templates import (
     send_doctor_approval_email,
     send_doctor_revocation_email,
     send_doctor_reapproval_email,
-)
+    send_doctor_rejection_email,
+    )
 from app.core.config import settings
 
 
@@ -538,18 +539,64 @@ async def reject_doctor_verification(
 
     await db.commit()
 
+    # 发送审核拒绝通知邮件
+
+    stmt = select(User).where(User.id == verification.user_id)
+
+    result = await db.execute(stmt)
+
+    user = result.scalar_one_or_none()
+
+    
+
+    if user:
+
+        try:
+
+            await send_doctor_rejection_email(
+
+                user.email,
+
+                user.full_name,
+
+                rejection.reason
+
+            )
+
+            logger.info(f"✅ 医生审核拒绝邮件已发送至 {user.email}")
+
+        except Exception as e:
+
+            logger.error(f"❌ 发送医生审核拒绝邮件失败: {e}")
+
+            # 邮件发送失败不阻止审核流程
+
+    
+
     # Log admin operation
+
     admin_logger = AdminOperationLogger(db)
+
     await admin_logger.log_operation(
+
         admin_id=admin.id,
+
         operation_type="reject_doctor",
+
         operation_details={
+
             "verification_id": str(verification_id),
+
             "doctor_user_id": str(verification.user_id),
+
             "reason": rejection.reason,
+
         },
+
         ip_address=request.client.host if request else None,
+
         user_agent=request.headers.get("user-agent") if request else None,
+
     )
 
     return {

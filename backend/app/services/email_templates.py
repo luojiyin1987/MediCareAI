@@ -329,6 +329,165 @@ async def send_doctor_pending_email(to_email: str, doctor_name: str) -> bool:
         text_content=text_content,
     )
     return success
+    return success
+
+
+
+# =============================================================================
+# 医生审核拒绝通知邮件 | Doctor Rejection Email
+# =============================================================================
+
+DOCTOR_REJECTION_SUBJECT = "【MediCareAI】医生注册审核未通过 - Doctor Registration Rejected"
+
+DOCTOR_REJECTION_HTML = Template("""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医生注册审核通知 - MediCareAI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6; 
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 20px auto; 
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            color: white; 
+            padding: 30px; 
+            text-align: center;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 10px; }
+        .content { padding: 30px; }
+        .welcome {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        .alert {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .alert strong { color: #721c24; }
+        .reason {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        .reason-label {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 5px;
+        }
+        .info-box {
+            background: #e8f4f8;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .info-box p { margin: 5px 0; font-size: 14px; }
+        .footer { 
+            background: #f8f9fa;
+            padding: 20px; 
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 医生注册审核通知</h1>
+            <p>Doctor Registration Review</p>
+        </div>
+        
+        <div class="content">
+            <h2 class="welcome">您好，$doctor_name</h2>
+            
+            <div class="alert">
+                <strong>很抱歉，您的医生注册申请未通过审核。</strong>
+            </div>
+            
+            <div class="reason">
+                <div class="reason-label">审核意见 / Rejection Reason：</div>
+                <div>$rejection_reason</div>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>您可以：</strong></p>
+                <p>• 根据审核意见修改资料后重新注册</p>
+                <p>• 使用原有的邮箱地址和执业证书号重新提交申请</p>
+                <p>• 如有疑问，请联系管理员了解详情</p>
+            </div>
+            
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                感谢您关注 MediCareAI 平台，期待您再次申请。
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>MediCareAI 智能疾病管理系统</strong></p>
+            <p>本邮件由系统自动发送，请勿直接回复</p>
+        </div>
+    </div>
+</body>
+</html>""")
+
+DOCTOR_REJECTION_TEXT = Template("""医生注册审核通知 - MediCareAI
+
+您好，$doctor_name
+
+很抱歉，您的医生注册申请未通过审核。
+
+审核意见 / Rejection Reason：
+$rejection_reason
+
+您可以：
+• 根据审核意见修改资料后重新注册
+• 使用原有的邮箱地址和执业证书号重新提交申请
+• 如有疑问，请联系管理员了解详情
+
+感谢您关注 MediCareAI 平台，期待您再次申请。
+
+MediCareAI 智能疾病管理系统
+本邮件由系统自动发送，请勿直接回复""")
+
+
+async def send_doctor_rejection_email(to_email: str, doctor_name: str, rejection_reason: str) -> bool:
+    
+    html_content = DOCTOR_REJECTION_HTML.substitute(doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因")
+    text_content = DOCTOR_REJECTION_TEXT.substitute(doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因")
+    
+    logger.info(f"正在发送医生审核拒绝邮件到 {to_email}")
+    success, error_msg = await temail_service.send_email(
+        to_email=to_email,
+        subject=DOCTOR_REJECTION_SUBJECT,
+        html_content=html_content,
+        text_content=text_content,
+    )
+    
+    if not success:
+        logger.error(f"医生审核拒绝邮件发送失败: {error_msg}")
+    
+    return success
+
 
 
 # =============================================================================
