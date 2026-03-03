@@ -1589,9 +1589,13 @@ async def test_oss_connection(db: AsyncSession, admin: User) -> AIModelTestRespo
             )
 
         # Test OSS connection using health check
+        # First reload config from database to ensure latest configuration is used
         from app.services.oss_service import os_service
-
+        
+        await os_service.reload_config_from_db(db)
+        
         health_result = os_service.health_check()
+
 
         latency_ms = int((asyncio.get_event_loop().time() - start_time) * 1000)
 
