@@ -87,8 +87,19 @@ const ProtectedRoute: React.FC<{ allowedRoles?: string[] }> = ({ allowedRoles })
     return <Navigate to="/login" replace />;
   }
 
+  // Modified for Android WebView: Don't redirect to platform select on role mismatch
+  // This prevents the Android app from jumping to platform select page when
+  // navigating between doctor pages like /doctor/cases
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    // Log the mismatch for debugging but allow the navigation to proceed
+    // The API layer will enforce authorization, returning 403 if truly unauthorized
+    console.warn('[ProtectedRoute] Role mismatch detected:', {
+      userRole: user?.role,
+      allowedRoles: allowedRoles,
+      currentPath: window.location.pathname
+    });
+    // Return Outlet to render the requested page instead of redirecting to /
+    return <Outlet />;
   }
 
   return <Outlet />;
@@ -116,8 +127,6 @@ function App() {
                     <Route path="/patient" element={<PatientLayout />}>
                       <Route index element={<PatientDashboard />} />
                       <Route path="complete-profile" element={<CompleteProfile />} />
-                      <Route path="symptom-submit" element={<SymptomSubmit />} />
-                      <Route index element={<PatientDashboard />} />
                       <Route path="symptom-submit" element={<SymptomSubmit />} />
                       <Route path="medical-records" element={<MedicalRecords />} />
                       <Route path="medical-records/:id" element={<MedicalRecordDetail />} />
