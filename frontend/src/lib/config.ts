@@ -1,7 +1,19 @@
 // 全局配置文件
+// 检测运行环境并设置合适的 API_BASE
+const getApiBase = (): string => {
+  // 优先使用环境变量
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // 生产环境使用相对路径，通过 Nginx 代理访问 API
+  // 这样可以避免 Mixed Content 问题
+  return '';
+};
+
 export const CONFIG = {
   // API 配置
-  API_BASE: '',  // 使用相对路径，通过 Nginx 代理访问 API
+  API_BASE: getApiBase(),  // 使用相对路径，通过 Nginx 代理访问 API
   API_VERSION: '/api/v1',
   
   // 请求配置
