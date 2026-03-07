@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 def _enrich_patient_response(patient, user: User) -> dict:
-    """从 User 表获取姓名并填充到患者响应中，避免数据冗余"""
+    """从 User 表获取信息并填充到患者响应中，避免数据冗余"""
     patient_dict = {
         "id": patient.id,
         "user_id": patient.user_id,
@@ -37,7 +37,10 @@ def _enrich_patient_response(patient, user: User) -> dict:
         "gender": patient.gender,
         "phone": patient.phone,
         "address": patient.address,
-        "emergency_contact": patient.emergency_contact,
+        # 紧急联系人信息优先从 User 表获取（新的分离字段）
+        "emergency_contact": user.emergency_contact if user.emergency_contact else patient.emergency_contact,
+        "emergency_contact_name": user.emergency_contact_name,
+        "emergency_contact_phone": user.emergency_contact_phone,
         "medical_record_number": patient.medical_record_number,
         "notes": patient.notes,
         "created_at": patient.created_at,

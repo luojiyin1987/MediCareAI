@@ -32,7 +32,7 @@ class PatientUpdate(BaseModel):
 
 
 class PatientResponse(BaseModel):
-    """患者响应 - 包含从 User 表获取的 user_full_name"""
+    """患者响应 - 包含从 User 表获取的 user_full_name 和分离的紧急联系人字段"""
     id: uuid.UUID
     user_id: uuid.UUID
     # 从 User 表获取的姓名，避免数据冗余
@@ -43,12 +43,15 @@ class PatientResponse(BaseModel):
     gender: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    emergency_contact: Optional[str] = None
+    # 紧急联系人信息（支持新旧两种格式）
+    emergency_contact: Optional[str] = None  # 组合格式（向后兼容）
+    emergency_contact_name: Optional[str] = None  # 分离字段：姓名
+    emergency_contact_phone: Optional[str] = None  # 分离字段：电话
     medical_record_number: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 

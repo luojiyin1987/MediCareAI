@@ -151,7 +151,17 @@ class User(Base):
     emergency_contact = Column(
         String(255),
         nullable=True,
-        comment="[Patient] Emergency contact / [患者] 紧急联系人",
+        comment="[Patient] Emergency contact (deprecated, use separate fields) / [患者] 紧急联系人（已弃用，请使用分离字段）",
+    )
+    emergency_contact_name = Column(
+        String(100),
+        nullable=True,
+        comment="[Patient] Emergency contact name / [患者] 紧急联系人姓名",
+    )
+    emergency_contact_phone = Column(
+        String(20),
+        nullable=True,
+        comment="[Patient] Emergency contact phone / [患者] 紧急联系人电话",
     )
 
     # Anonymized profile for sharing (auto-generated) | 匿名化资料（自动生成）

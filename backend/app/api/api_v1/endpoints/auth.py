@@ -40,12 +40,14 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
     user_service = UserService(db)
 
-    # 1. 创建用户账户（包含地址信息）
+    # 1. 创建用户账户（包含地址和紧急联系人信息）
     user = await user_service.create_user(
         email=user_data.email,
         password=user_data.password,
         full_name=user_data.full_name,
-        address=user_data.address,  # 添加地址
+        address=user_data.address,
+        emergency_contact_name=user_data.emergency_contact_name,
+        emergency_contact_phone=user_data.emergency_contact_phone,
     )
 
     # 2. 创建患者档案（如果有提供额外信息）

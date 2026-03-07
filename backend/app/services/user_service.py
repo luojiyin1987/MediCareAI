@@ -47,7 +47,15 @@ class UserService:
             logger.error(f"根据邮箱获取用户失败: {e}")
             return None
 
-    async def create_user(self, email: str, password: str, full_name: str, address: Optional[str] = None) -> User:
+    async def create_user(
+        self,
+        email: str,
+        password: str,
+        full_name: str,
+        address: Optional[str] = None,
+        emergency_contact_name: Optional[str] = None,
+        emergency_contact_phone: Optional[str] = None,
+    ) -> User:
         """创建新用户"""
         # 检查邮箱是否已存在
         existing_user = await self.get_user_by_email(email)
@@ -58,8 +66,22 @@ class UserService:
 
         password_hash = get_password_hash(password)
 
-        user = User(email=email, password_hash=password_hash, full_name=full_name, address=address)
+        # 组合紧急联系人字段（向后兼容）
+        emergency_contact = None
+        if emergency_contact_name or emergency_contact_phone:
+            name = emergency_contact_name or ""
+            phone = emergency_contact_phone or ""
+            emergency_contact = f"{name} {phone}".strip()
 
+        user = User(
+            email=email,
+            password_hash=password_hash,
+            full_name=full_name,
+            address=address,
+            emergency_contact=emergency_contact,
+            emergency_contact_name=emergency_contact_name,
+            emergency_contact_phone=emergency_contact_phone,
+        )
         try:
             self.db.add(user)
             await self.db.commit()
