@@ -77,7 +77,9 @@ data class Patient(
     val gender: String? = null,
     val phone: String? = null,
     val address: String? = null,
-    val emergency_contact: String? = null,
+    val emergency_contact: String? = null,  // 组合字段（向后兼容）
+    val emergency_contact_name: String? = null,  // 分离字段：姓名（问题1修复）
+    val emergency_contact_phone: String? = null,  // 分离字段：电话（问题1修复）
     val medical_record_number: String? = null,
     val notes: String? = null,
     val created_at: String? = null,
@@ -90,7 +92,9 @@ data class PatientUpdateRequest(
     val gender: String? = null,
     val phone: String? = null,
     val address: String? = null,
-    val emergency_contact: String? = null
+    val emergency_contact: String? = null,  // 组合字段（向后兼容）
+    val emergency_contact_name: String? = null,  // 分离字段：姓名（问题1修复）
+    val emergency_contact_phone: String? = null  // 分离字段：电话（问题1修复）
 )
 
 @Serializable
