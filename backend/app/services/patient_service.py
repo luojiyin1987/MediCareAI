@@ -57,6 +57,14 @@ class PatientService:
             date_of_birth=patient_data.date_of_birth,
             gender=patient_data.gender,
             phone=patient_data.phone,
+            emergency_contact=patient_data.emergency_contact,
+            medical_record_number=patient_data.medical_record_number
+        )
+            user_id=user_id,
+            name=None,  # 从 User 表动态获取，避免数据冗余
+            date_of_birth=patient_data.date_of_birth,
+            gender=patient_data.gender,
+            phone=patient_data.phone,
             address=None,  # 问题4修复：地址统一存储在 User 表
             emergency_contact=patient_data.emergency_contact,
             medical_record_number=patient_data.medical_record_number
