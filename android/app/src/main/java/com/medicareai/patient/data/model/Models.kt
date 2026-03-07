@@ -119,6 +119,7 @@ data class DiagnosisRequest(
     val symptoms: String,
     val symptom_severity: String? = null,
     val symptom_duration: String? = null,
+    val onset_time: String? = null,  // 发病时间
     val document_ids: List<String> = emptyList(),
     val doctor_ids: List<String> = emptyList(),
     val share_with_doctors: Boolean = false,
@@ -171,4 +172,59 @@ data class VerificationStatus(
     val role: String,
     val is_verified: Boolean,
     val email_verified: Boolean
+)
+
+@Serializable
+data class Doctor(
+    val id: String,
+    val display_name: String,
+    val hospital: String? = null,
+    val department: String? = null,
+    val specialty: String? = null,
+    val title: String? = null
+)
+
+@Serializable
+data class MedicalDocument(
+    val id: String,
+    val filename: String,
+    val file_type: String? = null,
+    val file_size: Int? = null,
+    val upload_status: String? = null,
+    val extracted_content: String? = null,
+    val cleaned_content: String? = null,
+    val medical_case_id: String? = null,
+    val created_at: String? = null
+)
+
+@Serializable
+data class KnowledgeSource(
+    val category: String? = null,
+    val category_name: String? = null,
+    val document_title: String? = null,
+    val section_title: String? = null,
+    val chunks: List<KnowledgeChunk>? = null
+)
+
+@Serializable
+data class KnowledgeChunk(
+    val chunk_text: String? = null,
+    val text_preview: String? = null,
+    val section_title: String? = null,
+    val document_title: String? = null,
+    val relevance_score: Double? = null
+)
+
+@Serializable
+data class StreamingDiagnosisResponse(
+    val chunk: String? = null,
+    val done: Boolean? = null,
+    val case_id: String? = null,
+    val model_id: String? = null,
+    val model_used: String? = null,
+    val tokens_used: Int? = null,
+    val knowledge_base_sources: List<KnowledgeSource>? = null,
+    val knowledge_sources: List<KnowledgeSource>? = null,
+    val message: String? = null,
+    val error: String? = null
 )

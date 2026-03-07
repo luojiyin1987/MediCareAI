@@ -3,7 +3,7 @@ package com.medicareai.patient.data.repository
 import com.medicareai.patient.data.api.MediCareApiClient
 import com.medicareai.patient.data.model.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -116,10 +116,44 @@ class MedicalCaseRepository @Inject constructor(
 }
 
 @Singleton
+class DoctorRepository @Inject constructor(
+    private val apiClient: MediCareApiClient
+) {
+    suspend fun getDoctors(): Result<List<Doctor>> {
+        return apiClient.getDoctors()
+    }
+}
+
+@Singleton
+class DocumentRepository @Inject constructor(
+    private val apiClient: MediCareApiClient
+) {
+    suspend fun uploadDocument(
+        file: File,
+        caseId: String,
+        onProgress: ((Float) -> Unit)? = null
+    ): Result<MedicalDocument> {
+        return apiClient.uploadDocument(file, caseId, onProgress)
+    }
+    
+    suspend fun extractDocument(documentId: String): Result<Unit> {
+        return apiClient.extractDocument(documentId)
+    }
+    
+    suspend fun getDocumentContent(documentId: String): Result<MedicalDocument> {
+        return apiClient.getDocumentContent(documentId)
+    }
+}
+
+@Singleton
 class AIDiagnosisRepository @Inject constructor(
     private val apiClient: MediCareApiClient
 ) {
     suspend fun diagnose(request: DiagnosisRequest): Result<AIFeedback> {
         return apiClient.diagnose(request)
+    }
+    
+    fun diagnoseStream(request: DiagnosisRequest): Flow<StreamingDiagnosisResponse> {
+        return apiClient.diagnoseStream(request)
     }
 }

@@ -8,8 +8,12 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import okhttp3.logging.HttpLoggingInterceptor
 import java.security.SecureRandom
@@ -17,6 +21,7 @@ import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.*
 import android.util.Log
+import java.io.File
 
 class MediCareApiClient {
     
@@ -81,9 +86,9 @@ class MediCareApiClient {
         }
         
         install(HttpTimeout) {
-            requestTimeoutMillis = 30000
+            requestTimeoutMillis = 120000  // 2 minutes for AI diagnosis
             connectTimeoutMillis = 30000
-            socketTimeoutMillis = 30000
+            socketTimeoutMillis = 120000
         }
         
         // Configure OkHttp engine for Android 16 compatibility
@@ -231,6 +236,128 @@ class MediCareApiClient {
     // AI Diagnosis APIs
     suspend fun diagnose(request: DiagnosisRequest): Result<AIFeedback> = 
         makeRequest(HttpMethod.Post, "ai/comprehensive-diagnosis", request)
+    
+    // Doctor APIs
+    suspend fun getDoctors(): Result<List<Doctor>> = 
+        makeRequest(HttpMethod.Get, "sharing/doctors")
+    
+    // Document Upload APIs
+    suspend fun uploadDocument(
+        file: File, 
+        caseId: String,
+        onProgress: ((Float) -> Unit)? = null
+    ): Result<MedicalDocument> {
+        return try {
+            Log.d(TAG, "Uploading document: ${file.name} for case: $caseId")
+            
+            val response = client.submitFormWithBinaryData(
+                url = BASE_URL + "documents/upload",
+                formData = formData {
+                    append("file", file.readBytes(), Headers.build {
+                        append(HttpHeaders.ContentDisposition, "filename=\"${file.name}\"")
+                        append(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
+                    })
+                    append("medical_case_id", caseId)
+                }
+            ) {
+                authToken?.let {
+                    header(HttpHeaders.Authorization, "Bearer $it")
+                }
+                onUpload { bytesSentTotal, contentLength ->
+                    if (contentLength > 0) {
+                        val progress = bytesSentTotal.toFloat() / contentLength.toFloat()
+                        onProgress?.invoke(progress)
+                    }
+                }
+                timeout {
+                    requestTimeoutMillis = 120000  // 2 minutes for large file uploads
+                }
+            }
+            
+            Log.d(TAG, "Upload response status: ${response.status}")
+            
+            if (response.status.isSuccess()) {
+                Result.success(response.body())
+            } else {
+                Result.failure(ApiException(
+                    response.status.value,
+                    "Upload failed: ${response.status}"
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Document upload failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+    
+    suspend fun extractDocument(documentId: String): Result<Unit> = 
+        makeRequest(HttpMethod.Post, "documents/$documentId/extract")
+    
+    suspend fun getDocumentContent(documentId: String): Result<MedicalDocument> = 
+        makeRequest(HttpMethod.Get, "documents/$documentId/content")
+    
+    // Streaming AI Diagnosis API
+    fun diagnoseStream(
+        request: DiagnosisRequest
+    ): Flow<StreamingDiagnosisResponse> = flow {
+        try {
+            Log.d(TAG, "Starting streaming diagnosis")
+            
+            val response = client.preparePost(BASE_URL + "ai/comprehensive-diagnosis-stream") {
+                authToken?.let {
+                    header(HttpHeaders.Authorization, "Bearer $it")
+                }
+                header(HttpHeaders.ContentType, ContentType.Application.Json)
+                header(HttpHeaders.Accept, "text/event-stream")
+                setBody(Json.encodeToString(DiagnosisRequest.serializer(), request))
+                timeout {
+                    requestTimeoutMillis = 300000  // 5 minutes timeout for streaming
+                }
+            }.execute()
+            
+            if (response.status.isSuccess()) {
+                val channel: ByteReadChannel = response.body()
+                
+                while (!channel.isClosedForRead) {
+                    val line = channel.readUTF8Line() ?: continue
+                    
+                    if (line.startsWith("data: ")) {
+                        val data = line.substring(6)
+                        Log.d(TAG, "Received SSE data: $data")
+                        try {
+                            val parsed = Json.decodeFromString(StreamingDiagnosisResponse.serializer(), data)
+                            Log.d(TAG, "Parsed response - done: ${parsed.done}, chunk: ${parsed.chunk != null}, model: ${parsed.model_id ?: parsed.model_used}")
+                            emit(parsed)
+                            
+                            if (parsed.done == true) {
+                                Log.d(TAG, "Completion response received, breaking loop")
+                                break
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to parse SSE data: $data", e)
+                            // Emit as raw chunk if parsing fails
+                            emit(StreamingDiagnosisResponse(chunk = data))
+                        }
+                    }
+                }
+                
+                // Stream ended naturally - emit done signal
+                emit(StreamingDiagnosisResponse(done = true))
+            } else {
+                emit(StreamingDiagnosisResponse(
+                    error = "HTTP ${response.status.value}",
+                    done = true
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Streaming diagnosis failed: ${e.message}", e)
+            emit(StreamingDiagnosisResponse(
+                error = e.message ?: "Unknown error",
+                done = true
+            ))
+        }
+    }
+
 }
 
 class ApiException(val code: Int, message: String) : Exception(message)

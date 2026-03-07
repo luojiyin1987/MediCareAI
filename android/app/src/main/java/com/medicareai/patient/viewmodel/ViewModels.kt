@@ -3,13 +3,14 @@ package com.medicareai.patient.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.medicareai.patient.data.model.*
-import com.medicareai.patient.data.repository.AuthRepository
-import com.medicareai.patient.data.repository.MedicalCaseRepository
-import com.medicareai.patient.data.repository.PatientRepository
-import com.medicareai.patient.data.repository.AIDiagnosisRepository
+import com.medicareai.patient.data.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
+import java.io.File
 import javax.inject.Inject
 
 sealed class UiState<out T> {
@@ -216,10 +217,24 @@ class MedicalRecordsViewModel @Inject constructor(
     }
 }
 
+// Streaming Diagnosis States
+data class StreamingDiagnosisState(
+    val isLoading: Boolean = false,
+    val content: String = "",
+    val status: String = "",
+    val modelId: String? = null,
+    val tokensUsed: Int? = null,
+    val knowledgeSources: List<KnowledgeSource> = emptyList(),
+    val error: String? = null,
+    val isComplete: Boolean = false
+)
+
 @HiltViewModel
 class SymptomSubmitViewModel @Inject constructor(
     private val caseRepository: MedicalCaseRepository,
-    private val aiRepository: AIDiagnosisRepository
+    private val aiRepository: AIDiagnosisRepository,
+    private val documentRepository: DocumentRepository,
+    private val doctorRepository: DoctorRepository
 ) : ViewModel() {
     
     private val _submitState = MutableStateFlow<UiState<MedicalCase>>(UiState.Idle)
@@ -228,48 +243,292 @@ class SymptomSubmitViewModel @Inject constructor(
     private val _diagnosisState = MutableStateFlow<UiState<AIFeedback>>(UiState.Idle)
     val diagnosisState: StateFlow<UiState<AIFeedback>> = _diagnosisState.asStateFlow()
     
+    // Streaming diagnosis state
+    private val _streamingState = MutableStateFlow(StreamingDiagnosisState())
+    val streamingState: StateFlow<StreamingDiagnosisState> = _streamingState.asStateFlow()
+    
+    // File upload state
+    private val _uploadState = MutableStateFlow<UiState<List<MedicalDocument>>>(UiState.Idle)
+    val uploadState: StateFlow<UiState<List<MedicalDocument>>> = _uploadState.asStateFlow()
+    
+    private val _uploadProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val uploadProgress: StateFlow<Map<String, Float>> = _uploadProgress.asStateFlow()
+    
+    // Selected files for upload
+    private val _selectedFiles = MutableStateFlow<List<File>>(emptyList())
+    val selectedFiles: StateFlow<List<File>> = _selectedFiles.asStateFlow()
+    
+    // Doctors list
+    private val _doctorsState = MutableStateFlow<UiState<List<Doctor>>>(UiState.Idle)
+    val doctorsState: StateFlow<UiState<List<Doctor>>> = _doctorsState.asStateFlow()
+    
+    // Selected doctors for @ mention
+    private val _selectedDoctors = MutableStateFlow<List<Doctor>>(emptyList())
+    val selectedDoctors: StateFlow<List<Doctor>> = _selectedDoctors.asStateFlow()
+    
     fun submitSymptoms(
         title: String,
         symptoms: String,
         severity: String? = null,
-        description: String? = null
+        description: String? = null,
+        onsetTime: String? = null,
+        duration: String? = null,
+        documentIds: List<String> = emptyList(),
+        doctorIds: List<String> = emptyList(),
+        shareWithDoctors: Boolean = false
     ) {
         viewModelScope.launch {
+            // Set loading state IMMEDIATELY for better UX
+            _streamingState.value = StreamingDiagnosisState(
+                isLoading = true,
+                status = "正在准备..."
+            )
             _submitState.value = UiState.Loading
+            
             caseRepository.createCase(title, symptoms, severity, description)
                 .onSuccess { case ->
                     _submitState.value = UiState.Success(case)
-                    // Start AI diagnosis
-                    diagnose(case.id, symptoms, severity)
+                    
+                    // Upload any pending files first - SYNCHRONOUSLY
+                    val files = _selectedFiles.value
+                    val uploadedDocIds = mutableListOf<String>()
+                    
+                    if (files.isNotEmpty()) {
+                        _uploadState.value = UiState.Loading
+                        _streamingState.value = _streamingState.value.copy(
+                            status = "正在上传 ${files.size} 个文件..."
+                        )
+                        
+                        // Use async/await to wait for all uploads to complete
+                        val uploadJobs = files.mapIndexed { index, file ->
+                            async {
+                                _streamingState.value = _streamingState.value.copy(
+                                    status = "正在上传文件 ${index + 1}/${files.size}: ${file.name}"
+                                )
+                                
+                                documentRepository.uploadDocument(file, case.id) { progress ->
+                                    _uploadProgress.value = _uploadProgress.value + (file.name to progress)
+                                }.onSuccess { doc ->
+                                    uploadedDocIds.add(doc.id)
+                                    // Trigger document extraction
+                                    _streamingState.value = _streamingState.value.copy(
+                                        status = "正在处理文档 (${index + 1}/${files.size}): MinerU提取中..."
+                                    )
+                                    documentRepository.extractDocument(doc.id)
+                                    // Poll for extraction completion
+                                    var isProcessed = false
+                                    var attempts = 0
+                                    val maxAttempts = 60  // 5 minutes (5 seconds * 60)
+                                    
+                                    while (!isProcessed && attempts < maxAttempts) {
+                                        delay(5000)  // Wait 5 seconds between checks
+                                        documentRepository.getDocumentContent(doc.id)
+                                            .onSuccess { updatedDoc ->
+                                                when (updatedDoc.upload_status) {
+                                                    "processed" -> {
+                                                        isProcessed = true
+                                                        _streamingState.value = _streamingState.value.copy(
+                                                            status = "文档 ${index + 1}/${files.size} 处理完成"
+                                                        )
+                                                    }
+                                                    "failed" -> {
+                                                        isProcessed = true
+                                                        _uploadState.value = UiState.Error("文档处理失败: ${updatedDoc.filename}")
+                                                    }
+                                                    else -> {
+                                                        // Still processing, update status
+                                                        _streamingState.value = _streamingState.value.copy(
+                                                            status = "正在处理文档 (${index + 1}/${files.size}): 第${attempts + 1}次检查..."
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        attempts++
+                                    }
+                                    
+                                    if (!isProcessed) {
+                                        _uploadState.value = UiState.Error("文档处理超时: ${doc.filename}")
+                                    }
+                                }.onFailure { error ->
+                                    _uploadState.value = UiState.Error("上传失败: ${error.message}")
+                                }
+                            }
+                        }
+                        
+                        // Wait for all uploads AND extractions to complete
+                        uploadJobs.awaitAll()
+                        
+                        _uploadState.value = UiState.Success(emptyList())
+                    }
+                    
+                    // Start streaming AI diagnosis with uploaded documents and selected doctors
+                    _streamingState.value = _streamingState.value.copy(
+                        status = "正在启动AI诊断..."
+                    )
+                    
+                    diagnoseStream(
+                        caseId = case.id,
+                        symptoms = symptoms,
+                        severity = severity,
+                        onsetTime = onsetTime,
+                        duration = duration,
+                        documentIds = uploadedDocIds + documentIds,
+                        doctorIds = doctorIds + _selectedDoctors.value.map { it.id },
+                        shareWithDoctors = shareWithDoctors
+                    )
                 }
                 .onFailure { error ->
                     _submitState.value = UiState.Error(error.message ?: "提交失败")
+                    _streamingState.value = StreamingDiagnosisState(
+                        isLoading = false,
+                        error = error.message ?: "提交失败",
+                        status = "提交失败"
+                    )
+                }
+        }
+    }
+
+    
+    fun loadDoctors() {
+        viewModelScope.launch {
+            _doctorsState.value = UiState.Loading
+            doctorRepository.getDoctors()
+                .onSuccess { doctors ->
+                    _doctorsState.value = UiState.Success(doctors)
+                }
+                .onFailure { error ->
+                    _doctorsState.value = UiState.Error(error.message ?: "加载医生列表失败")
                 }
         }
     }
     
-    private fun diagnose(caseId: String, symptoms: String, severity: String?) {
-        viewModelScope.launch {
-            _diagnosisState.value = UiState.Loading
-            aiRepository.diagnose(
-                DiagnosisRequest(
-                    symptoms = symptoms,
-                    symptom_severity = severity,
-                    case_id = caseId,
-                    language = "zh"
-                )
-            )
-                .onSuccess { feedback ->
-                    _diagnosisState.value = UiState.Success(feedback)
-                }
-                .onFailure { error ->
-                    _diagnosisState.value = UiState.Error(error.message ?: "诊断失败")
-                }
+    fun addSelectedFile(file: File) {
+        _selectedFiles.value = _selectedFiles.value + file
+    }
+    
+    fun removeSelectedFile(file: File) {
+        _selectedFiles.value = _selectedFiles.value - file
+    }
+    
+    fun selectDoctor(doctor: Doctor) {
+        if (!_selectedDoctors.value.contains(doctor)) {
+            _selectedDoctors.value = _selectedDoctors.value + doctor
         }
+    }
+    
+    fun unselectDoctor(doctor: Doctor) {
+        _selectedDoctors.value = _selectedDoctors.value - doctor
     }
     
     fun clearStates() {
         _submitState.value = UiState.Idle
         _diagnosisState.value = UiState.Idle
+        _streamingState.value = StreamingDiagnosisState()
+        _uploadState.value = UiState.Idle
+        _uploadProgress.value = emptyMap()
+        _selectedFiles.value = emptyList()
+        _selectedDoctors.value = emptyList()
+    }
+    
+    private fun diagnoseStream(
+        caseId: String,
+        symptoms: String,
+        severity: String?,
+        onsetTime: String?,
+        duration: String?,
+        documentIds: List<String>,
+        doctorIds: List<String>,
+        shareWithDoctors: Boolean
+    ) {
+        viewModelScope.launch {
+            _streamingState.value = _streamingState.value.copy(
+                isLoading = true,
+                status = "AI诊断中..."
+            )
+            
+            val request = DiagnosisRequest(
+                case_id = caseId,
+                symptoms = symptoms,
+                symptom_severity = severity,
+                onset_time = onsetTime,
+                symptom_duration = duration,
+                document_ids = documentIds,
+                doctor_ids = doctorIds,
+                share_with_doctors = shareWithDoctors
+            )
+            
+            aiRepository.diagnoseStream(request)
+                .collect { response ->
+                    android.util.Log.d("DiagnosisVM", "Received response - done: ${response.done}, chunk: ${response.chunk != null}, model: ${response.model_id ?: response.model_used}, tokens: ${response.tokens_used}")
+                    when {
+                        response.error != null -> {
+                            android.util.Log.e("DiagnosisVM", "Error: ${response.error}")
+                            _streamingState.value = _streamingState.value.copy(
+                                isLoading = false,
+                                error = response.error,
+                                status = "诊断失败"
+                            )
+                        }
+                        response.done == true -> {
+                            android.util.Log.d("DiagnosisVM", "Completion received - model: ${response.model_id ?: response.model_used}, tokens: ${response.tokens_used}, kb: ${response.knowledge_base_sources?.size ?: 0}")
+                            // Only update model/tokens if they're not already set from chunk parsing
+                            val newModelId = response.model_id ?: response.model_used
+                            val newTokens = response.tokens_used
+                            val newKbSources = response.knowledge_sources ?: response.knowledge_base_sources
+                            
+                            _streamingState.value = _streamingState.value.copy(
+                                isLoading = false,
+                                status = "诊断完成",
+                                // Only overwrite if new values are not null, otherwise keep existing
+                                modelId = if (newModelId != null) newModelId else _streamingState.value.modelId,
+                                tokensUsed = if (newTokens != null) newTokens else _streamingState.value.tokensUsed,
+                                knowledgeSources = if (!newKbSources.isNullOrEmpty()) newKbSources else _streamingState.value.knowledgeSources,
+                                isComplete = true
+                            )
+                        }
+                        else -> {
+
+                            // Append chunk to existing content (filter out JSON metadata)
+                            val chunk = response.chunk ?: ""
+                            android.util.Log.d("DiagnosisVM", "Chunk received: ${chunk.take(50)}...")
+                            
+                            // Check if this chunk contains completion JSON
+                            if (chunk.trimStart().startsWith("{\"done\"") && chunk.contains("case_id")) {
+                                // Parse completion JSON from chunk
+                                try {
+                                    // Use Json parser with ignoreUnknownKeys to handle extra fields from backend
+                                    val jsonParser = kotlinx.serialization.json.Json {
+                                        ignoreUnknownKeys = true
+                                    }
+                                    val completionData = jsonParser.decodeFromString(
+                                        com.medicareai.patient.data.model.StreamingDiagnosisResponse.serializer(),
+                                        chunk
+                                    )
+                                    android.util.Log.d("DiagnosisVM", "Parsed completion from chunk - model: ${completionData.model_id ?: completionData.model_used}, tokens: ${completionData.tokens_used}")
+                                    
+                                    // Update state with completion data
+                                    _streamingState.value = _streamingState.value.copy(
+                                        modelId = completionData.model_id ?: completionData.model_used,
+                                        tokensUsed = completionData.tokens_used,
+                                        knowledgeSources = completionData.knowledge_sources 
+                                            ?: completionData.knowledge_base_sources 
+                                            ?: emptyList(),
+                                        isComplete = true
+                                    )
+                                } catch (e: Exception) {
+                                    android.util.Log.e("DiagnosisVM", "Failed to parse completion JSON from chunk", e)
+                                }
+                            } else {
+                                // Regular content chunk - append to content
+                                val currentContent = _streamingState.value.content
+                                _streamingState.value = _streamingState.value.copy(
+                                    content = currentContent + chunk,
+                                    status = response.message ?: "诊断中..."
+                                )
+                            }
+                        }
+                    }
+                }
+        }
     }
 }

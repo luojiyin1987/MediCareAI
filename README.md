@@ -836,7 +836,77 @@ MediCareAI/
 ├── CONTRIBUTING.md               # Contributing - 贡献指南
 ├── CODE_OF_CONDUCT.md            # Code of Conduct - 行为准则
 └── LICENSE                       # MIT License - MIT 许可证
+
+---
+
+## 📱 Android App Build | Android 应用构建
+
+### Build Requirements | 构建要求
+
+**English:**
+- Android Studio 2023.1+ (Giraffe or later)
+- JDK 17+
+- Android SDK 34+
+- Gradle 8.2+
+- ADB (Android Debug Bridge) for device deployment
+
+**中文:**
+- Android Studio 2023.1+ (Giraffe 或更高版本)
+- JDK 17+
+- Android SDK 34+
+- Gradle 8.2+
+- ADB (Android Debug Bridge) 用于设备部署
+
+### Build Commands | 构建命令
+
+```bash
+# Navigate to Android project directory
+cd /home/houge/Test/MediCareAI/android
+
+# Build debug APK using Gradle Wrapper
+java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleDebug
+
+# Or clean and rebuild
+java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain clean assembleDebug
+
+# Build release APK (requires signing configuration)
+java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleRelease
 ```
+
+### Install to Device | 安装到设备
+
+```bash
+# Ensure ADB is installed and device is connected
+adb devices
+
+# Install debug APK to specific device
+adb -s <device_id> install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Example with device ID 2a84d91b
+adb -s 2a84d91b install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Development Setup | 开发环境设置
+
+**1. Open Project in Android Studio**
+- Open `android/` folder in Android Studio
+- Wait for Gradle sync to complete
+- Select device/emulator in toolbar
+- Click Run button
+
+**2. Configure API Endpoint**
+Edit `android/app/src/main/java/com/medicareai/patient/data/api/MediCareApiClient.kt`:
+```kotlin
+private const val BASE_URL = "https://your-domain.com/api/v1/"
+```
+
+**3. Debug Certificates**
+Debug build uses self-signed certificates stored in:
+- `android/app/src/main/res/raw/debug_certs`
+
+---
+
+## 🔧 Configuration | 配置说明
 
 ---
 

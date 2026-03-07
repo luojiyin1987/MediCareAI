@@ -41,4 +41,16 @@ object AppModule {
     fun provideAIDiagnosisRepository(apiClient: MediCareApiClient): AIDiagnosisRepository {
         return AIDiagnosisRepository(apiClient)
     }
+    
+    @Provides
+    @Singleton
+    fun provideDoctorRepository(apiClient: MediCareApiClient): DoctorRepository {
+        return DoctorRepository(apiClient)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideDocumentRepository(apiClient: MediCareApiClient): DocumentRepository {
+        return DocumentRepository(apiClient)
+    }
 }

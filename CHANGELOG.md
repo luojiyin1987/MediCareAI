@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [3.3.0] - 2026-03-07
+
+### Android 症状提交功能全面升级 | Android Symptom Submission Major Upgrade | 📱
+
+#### 新增功能 Features | ✨
+
+**1. 症状提交表单增强 (Enhanced Symptom Submission Form)**
+- **持续时间输入**: 新增数值输入框 + 单位选择器（秒/分钟/小时/天/周/月）
+- **发病时间选择**: 日期选择器组件，支持年/月/日选择
+- **严重程度下拉**: 轻微/轻度/中度/重度/严重 五级选择
+- **诱因和既往病史**: 保留原有输入框，整合到 description 字段
+
+**2. 检查资料上传功能 (Medical Document Upload)**
+- **文件选择器**: 支持 PDF、图片、文档等多格式文件选择
+- **多文件上传**: 支持同时选择多个文件（建议最多5个）
+- **上传进度显示**: 实时显示每个文件的上传进度条
+- **同步上传处理**: 使用 async/await 确保所有文件上传完成后再开始 AI 诊断
+- **MinerU 文档提取**: 自动触发 MinerU 服务提取文档内容，轮询等待提取完成
+- **文件限制**: 单个文件不超过 10MB
+
+**3. @提及医生功能 (@Doctor Mention System)**
+- **医生列表获取**: 从 `/sharing/doctors` API 获取可分享医生列表
+- **医生选择弹窗**: 可展开/折叠的医生选择对话框
+- **医生标签显示**: 已选择医生以 Chip 形式展示，支持移除
+- **医生信息展示**: 显示医生姓名、医院、科室、职称
+- **隐私授权集成**: 与隐私授权复选框联动，控制是否分享给医生
+
+**4. AI 诊断流式输出 (Streaming AI Diagnosis)**
+- **实时流式显示**: 使用 SSE (Server-Sent Events) 接收 AI 诊断内容
+- **Markdown 渲染**: 支持标题、粗体、列表、表格等 Markdown 格式
+- **进度指示器**: 显示当前诊断状态（正在上传/正在处理/诊断中）
+- **实时状态更新**: 文件上传进度、MinerU 处理状态实时反馈
+
+**5. 诊断结果展示增强 (Enhanced Diagnosis Result Display)**
+- **AI 模型信息**: 显示使用的 AI 模型名称（如 deepseek-chat）
+- **Token 消耗统计**: 显示本次诊断消耗的 Token 数量
+- **知识库引用**: 可折叠的 RAG 知识库引用区域
+  - 显示引用的医疗指南来源
+  - 显示相关性评分
+  - 显示文档标题和章节信息
+- **完成状态检测**: 正确解析后端返回的 completion JSON
+
+#### Bug 修复 Bug Fixes | 🐛
+
+**1. 症状提交 description 字段 null 值修复**
+- **问题**: description 字段传递 null 导致数据库错误
+- **修复**: 确保 description 始终为字符串类型（空字符串代替 null）
+
+**2. 文件上传异步问题修复**
+- **问题**: 文件上传未完成就开始 AI 诊断，导致文档内容未纳入诊断
+- **修复**: 使用 `async/await` 模式确保所有文件上传和 MinerU 提取完成后再开始诊断
+
+**3. 诊断结果 JSON 解析修复**
+- **问题**: 后端发送的 completion JSON 包含额外字段导致解析失败
+- **修复**: 使用 `ignoreUnknownKeys = true` 配置 JSON 解析器
+
+**4. 诊断结果模型/Token 显示修复**
+- **问题**: completion JSON 在 chunk 中发送，但响应中 model/tokens 为 null
+- **修复**: 从 chunk 中解析 completion JSON 并正确提取 model、tokens、knowledge_sources
+
+**5. Markdown 表格渲染修复**
+- **问题**: Markdown 表格显示为原始文本（| 列1 | 列2 |）
+- **修复**: 实现表格行解析，以 Row 组件展示表格内容
+
+#### 技术实现 Technical Implementation | 🔧
+
+**ViewModel 层**
+- `SymptomSubmitViewModel`: 新增文件上传、医生选择、流式诊断管理
+- `StreamingDiagnosisState`: 新增流式诊断状态数据类
+- 使用 `async/await` 实现同步上传流程
+- 使用 `kotlinx.coroutines.flow` 收集 SSE 流数据
+
+**UI 层**
+- `SymptomSubmitScreen`: 完全重构症状提交界面
+- `FileUploadItem`: 文件上传进度项组件
+- `DoctorChip`: 医生选择标签组件
+- `DoctorSelectionDialog`: 医生选择对话框
+- `SimpleMarkdownContent`: Markdown 内容渲染组件
+- `KnowledgeSourcesSection`: 知识库引用折叠面板
+
+**网络层**
+- `MediCareApiClient.diagnoseStream()`: 实现 SSE 流式请求
+- 支持解析 `data:` 前缀的 SSE 消息
+- 处理 chunk 和 completion 两种消息类型
+
+#### 新增文件 Added Files
+- `android/app/src/main/java/com/medicareai/patient/ui/screens/SymptomSubmitScreen.kt` - 症状提交主界面
+- `android/app/src/main/java/com/medicareai/patient/viewmodel/ViewModels.kt` - ViewModel 实现
+
+#### 变更 Changed
+- `android/app/src/main/java/com/medicareai/patient/data/api/MediCareApiClient.kt` - 新增流式诊断 API
+- `android/app/src/main/java/com/medicareai/patient/data/model/Models.kt` - 新增数据模型
+- `android/app/src/main/java/com/medicareai/patient/data/repository/Repository.kt` - 新增 Repository 方法
+
+---
+
 ## [3.2.0] - 2026-03-05
 
 ### Android App UI 修复与法律文档 | Android App UI Fixes & Legal Documentation | 📱
