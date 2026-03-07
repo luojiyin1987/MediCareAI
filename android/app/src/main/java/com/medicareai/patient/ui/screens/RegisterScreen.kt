@@ -26,6 +26,8 @@ import com.medicareai.patient.ui.theme.PrimaryBlue
 import com.medicareai.patient.ui.theme.PrimaryPurple
 import com.medicareai.patient.viewmodel.AuthViewModel
 import com.medicareai.patient.viewmodel.UiState
+import com.medicareai.patient.ui.components.DatePickerField
+import com.medicareai.patient.ui.components.AddressPickerField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,7 @@ fun RegisterScreen(
     var dateOfBirth by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
+    var detailAddress by remember { mutableStateOf("") }
     var emergencyContactName by remember { mutableStateOf("") }
     var emergencyContactPhone by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
@@ -226,17 +229,11 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     // Date of Birth
-                    OutlinedTextField(
-                        value = dateOfBirth,
-                        onValueChange = { dateOfBirth = it },
-                        label = { Text(stringResource(R.string.date_of_birth)) },
-                        leadingIcon = {
-                            Icon(Icons.Default.CalendarToday, null, tint = PrimaryBlue)
-                        },
-                        placeholder = { Text("YYYY-MM-DD") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
+                    DatePickerField(
+                        label = stringResource(R.string.date_of_birth),
+                        selectedDate = dateOfBirth,
+                        onDateSelected = { dateOfBirth = it },
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
                     Spacer(modifier = Modifier.height(12.dp))
@@ -288,6 +285,33 @@ fun RegisterScreen(
                             )
                         }
                     }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Address
+                    AddressPickerField(
+                        label = "省市区",
+                        address = address,
+                        onAddressSelected = { province, city, district, fullAddress ->
+                            address = fullAddress
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Detail Address
+                    OutlinedTextField(
+                        value = detailAddress,
+                        onValueChange = { detailAddress = it },
+                        label = { Text("详细地址（选填）") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Home, null, tint = PrimaryBlue)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
@@ -389,6 +413,11 @@ fun RegisterScreen(
                     // Register button
                     Button(
                         onClick = {
+                            val fullAddress = if (detailAddress.isNotBlank()) {
+                                "$address $detailAddress"
+                            } else {
+                                address
+                            }
                             viewModel.register(
                                 email = email,
                                 password = password,
@@ -396,7 +425,7 @@ fun RegisterScreen(
                                 dateOfBirth = dateOfBirth.takeIf { it.isNotEmpty() },
                                 gender = gender.takeIf { it.isNotEmpty() },
                                 phone = phone.takeIf { it.isNotEmpty() },
-                                address = address.takeIf { it.isNotEmpty() },
+                                address = fullAddress.takeIf { it.isNotBlank() },
                                 emergencyContactName = emergencyContactName.takeIf { it.isNotEmpty() },
                                 emergencyContactPhone = emergencyContactPhone.takeIf { it.isNotEmpty() }
                             )
