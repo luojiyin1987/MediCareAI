@@ -20,6 +20,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    """更新用户信息 - 支持紧急联系人分离字段（问题1修复）"""
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
     # Doctor-specific fields
@@ -31,10 +32,13 @@ class UserUpdate(BaseModel):
     license_number: Optional[str] = None
     display_name: Optional[str] = None
     phone: Optional[str] = None
-    address: Optional[str] = None  # 添加地址字段
-
+    address: Optional[str] = None
+    # 问题1修复：添加紧急联系人分离字段
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
 
 class UserResponse(UserBase):
+    """用户响应 - 包含分离的紧急联系人字段（问题1修复）"""
     id: uuid.UUID
     is_active: bool
     is_verified: bool
@@ -42,9 +46,12 @@ class UserResponse(UserBase):
     last_login: Optional[datetime] = None
     # Patient-specific fields
     phone: Optional[str] = None
-    address: Optional[str] = None  # 添加地址字段
+    address: Optional[str] = None
     date_of_birth: Optional[datetime] = None
     gender: Optional[str] = None
+    # 问题1修复：紧急联系人分离字段
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
 
     class Config:
         from_attributes = True
