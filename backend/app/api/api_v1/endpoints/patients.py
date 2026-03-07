@@ -22,6 +22,9 @@ from app.schemas.chronic_disease import (
     PatientChronicConditionListResponse,
 )
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -55,15 +58,32 @@ async def get_my_patient(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> PatientResponse:
-    """获取当前用户的患者信息（主档案）"""
+    """获取当前用户的患者信息（主档案）
+    
+    如果没有患者档案，自动创建一个空档案"""
     patient_service = PatientService(db)
     patients = await patient_service.get_patients_by_user(
         current_user.id, skip=0, limit=1
     )
+    
     if not patients:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Patient profile not found"
-        )
+        # 自动创建空的患者档案
+        logger.info(f"用户 {current_user.id} 没有患者档案，自动创建")
+        from app.schemas.patient import PatientCreate
+        empty_patient_data = PatientCreate()
+        try:
+            new_patient = await patient_service.create_patient(
+                patient_data=empty_patient_data, user_id=current_user.id
+            )
+            await db.refresh(new_patient)
+            patients = [new_patient]
+        except Exception as e:
+            logger.error(f"自动创建患者档案失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail="无法创建患者档案"
+            )
+    
     return _enrich_patient_response(patients[0], current_user)
 
 
