@@ -340,6 +340,11 @@ class MediCareApiClient {
                         val data = line.substring(6)
                         Log.d(TAG, "Received SSE data: $data")
                         try {
+                            // Use Json parser with ignoreUnknownKeys to handle extra fields from backend
+                            val jsonParser = kotlinx.serialization.json.Json {
+                                ignoreUnknownKeys = true
+                            }
+                            val parsed = jsonParser.decodeFromString(StreamingDiagnosisResponse.serializer(), data)
                             val parsed = Json.decodeFromString(StreamingDiagnosisResponse.serializer(), data)
                             Log.d(TAG, "Parsed response - done: ${parsed.done}, chunk: ${parsed.chunk != null}, model: ${parsed.model_id ?: parsed.model_used}")
                             emit(parsed)
