@@ -5,7 +5,7 @@ Provides messaging functionality for doctors to communicate with admins.
 医生向管理员发送站内信的功能。
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, and_, or_, func
 from sqlalchemy.orm import selectinload
@@ -63,7 +63,8 @@ async def get_default_admin(db: AsyncSession) -> Optional[User]:
 
 @router.post("/messages", response_model=Dict[str, Any])
 async def send_message(
-    request: SendMessageRequest,
+    message_request: SendMessageRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -75,10 +76,10 @@ async def send_message(
     医生只能给管理员发送消息。如果没有指定接收者，消息会发送给默认管理员。
     """
     # Extract data from request
-    subject = request.subject
-    content = request.content
-    recipient_id = request.recipient_id
-    parent_id = request.parent_id
+    subject = message_request.subject
+    content = message_request.content
+    recipient_id = message_request.recipient_id
+    parent_id = message_request.parent_id
 
     # Check if user is a doctor
     if current_user.role != "doctor":
@@ -183,7 +184,7 @@ async def send_message(
                 "recipient_id": str(target_recipient_id),
                 "subject": subject,
             },
-            ip_address="",
+            ip_address=http_request.client.host if http_request else None,
         )
     except Exception as log_error:
         logger.warning(f"Failed to log message operation: {log_error}")
@@ -619,7 +620,8 @@ async def get_admin_message_detail(
 @router.post("/admin/messages/{message_id}/reply", response_model=Dict[str, Any])
 async def reply_to_message(
     message_id: UUID,
-    request: ReplyMessageRequest,
+    reply_request: ReplyMessageRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -634,7 +636,7 @@ async def reply_to_message(
             detail="Only admins can reply to messages",
         )
 
-    content = request.content.strip()
+    content = reply_request.content.strip()
 
     if not content:
         raise HTTPException(
@@ -682,7 +684,7 @@ async def reply_to_message(
                 "original_message_id": str(message_id),
                 "recipient_id": str(original_msg.sender_id),
             },
-            ip_address="",
+            ip_address=http_request.client.host if http_request else None,
         )
     except Exception as log_error:
         logger.warning(f"Failed to log reply operation: {log_error}")
@@ -749,7 +751,8 @@ class MaintenanceNotificationRequest(BaseModel):
 
 @router.post("/admin/maintenance-notification", response_model=Dict[str, Any])
 async def send_maintenance_notification(
-    request: MaintenanceNotificationRequest,
+    notification_request: MaintenanceNotificationRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -767,15 +770,20 @@ async def send_maintenance_notification(
         )
 
     # Validate maintenance_time
-    if not request.maintenance_time or len(request.maintenance_time.strip()) == 0:
+    if (
+        not notification_request.maintenance_time
+        or len(notification_request.maintenance_time.strip()) == 0
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Maintenance time is required",
         )
 
-    maintenance_time = request.maintenance_time.strip()
+    maintenance_time = notification_request.maintenance_time.strip()
     maintenance_content = (
-        request.maintenance_content.strip() if request.maintenance_content else None
+        notification_request.maintenance_content.strip()
+        if notification_request.maintenance_content
+        else None
     )
 
     # Get all patients and doctors (exclude admins)
@@ -831,7 +839,7 @@ async def send_maintenance_notification(
                 "failed_count": failed_count,
                 "failed_emails": failed_emails,
             },
-            ip_address="",
+            ip_address=http_request.client.host if http_request else None,
         )
     except Exception as log_error:
         logger.warning(f"Failed to log maintenance notification operation: {log_error}")
