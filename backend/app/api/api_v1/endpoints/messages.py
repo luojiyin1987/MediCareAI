@@ -18,6 +18,7 @@ from app.db.database import get_db
 from app.core.deps import get_current_active_user
 from app.models.models import User, InternalMessage
 from app.api.api_v1.endpoints.admin import AdminOperationLogger
+from app.services.email_templates import send_maintenance_notification_email
 import logging
 
 logger = logging.getLogger(__name__)
@@ -182,7 +183,7 @@ async def send_message(
                 "recipient_id": str(target_recipient_id),
                 "subject": subject,
             },
-            ip_address=None,
+            ip_address="",
         )
     except Exception as log_error:
         logger.warning(f"Failed to log message operation: {log_error}")
@@ -440,8 +441,7 @@ async def get_admin_messages(
 
     # Get messages
     stmt = (
-        base_query
-        .order_by(desc(InternalMessage.created_at))
+        base_query.order_by(desc(InternalMessage.created_at))
         .offset(offset)
         .limit(page_size)
     )
@@ -454,22 +454,24 @@ async def get_admin_messages(
         sender_stmt = select(User).where(User.id == msg.sender_id)
         sender_result = await db.execute(sender_stmt)
         sender = sender_result.scalar_one_or_none()
-        
-        messages_list.append({
-            "id": str(msg.id),
-            "subject": msg.subject,
-            "content": msg.content[:200] + "..."
-            if len(msg.content) > 200
-            else msg.content,
-            "sender": {
-                "id": str(sender.id) if sender else None,
-                "full_name": sender.full_name if sender else "Unknown",
-                "email": sender.email if sender else None,
-            },
-            "is_read": msg.is_read,
-            "read_at": msg.read_at.isoformat() if msg.read_at else None,
-            "created_at": msg.created_at.isoformat(),
-        })
+
+        messages_list.append(
+            {
+                "id": str(msg.id),
+                "subject": msg.subject,
+                "content": msg.content[:200] + "..."
+                if len(msg.content) > 200
+                else msg.content,
+                "sender": {
+                    "id": str(sender.id) if sender else None,
+                    "full_name": sender.full_name if sender else "Unknown",
+                    "email": sender.email if sender else None,
+                },
+                "is_read": msg.is_read,
+                "read_at": msg.read_at.isoformat() if msg.read_at else None,
+                "created_at": msg.created_at.isoformat(),
+            }
+        )
 
     # Get unread count
     unread_stmt = select(InternalMessage).where(
@@ -510,13 +512,10 @@ async def get_admin_message_detail(
 
     try:
         # First, get the message with a fresh session approach
-        stmt = (
-            select(InternalMessage)
-            .where(
-                and_(
-                    InternalMessage.id == message_id,
-                    InternalMessage.recipient_id == current_user.id,
-                )
+        stmt = select(InternalMessage).where(
+            and_(
+                InternalMessage.id == message_id,
+                InternalMessage.recipient_id == current_user.id,
             )
         )
         result = await db.execute(stmt)
@@ -568,20 +567,19 @@ async def get_admin_message_detail(
                 "id": str(reply.id),
                 "subject": reply.subject,
                 "content": reply.content,
-                "created_at": reply.created_at.isoformat() if reply.created_at else None,
+                "created_at": reply.created_at.isoformat()
+                if reply.created_at
+                else None,
             }
             for reply in replies
         ]
 
         # Mark as read if not already (use a separate transaction)
         if not message_is_read:
-            update_stmt = (
-                select(InternalMessage)
-                .where(
-                    and_(
-                        InternalMessage.id == message_id,
-                        InternalMessage.recipient_id == current_user.id,
-                    )
+            update_stmt = select(InternalMessage).where(
+                and_(
+                    InternalMessage.id == message_id,
+                    InternalMessage.recipient_id == current_user.id,
                 )
             )
             update_result = await db.execute(update_stmt)
@@ -601,8 +599,12 @@ async def get_admin_message_detail(
             "is_read": message_is_read,
             "read_at": message_read_at.isoformat() if message_read_at else None,
             "replies": replies_data,
-            "created_at": message_created_at.isoformat() if message_created_at else None,
-            "updated_at": message_updated_at.isoformat() if message_updated_at else None,
+            "created_at": message_created_at.isoformat()
+            if message_created_at
+            else None,
+            "updated_at": message_updated_at.isoformat()
+            if message_updated_at
+            else None,
         }
     except Exception as e:
         logger.error(f"Error fetching message detail: {str(e)}")
@@ -610,7 +612,7 @@ async def get_admin_message_detail(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch message: {str(e)}"
+            detail=f"Failed to fetch message: {str(e)}",
         )
 
 
@@ -680,7 +682,7 @@ async def reply_to_message(
                 "original_message_id": str(message_id),
                 "recipient_id": str(original_msg.sender_id),
             },
-            ip_address=None,
+            ip_address="",
         )
     except Exception as log_error:
         logger.warning(f"Failed to log reply operation: {log_error}")
@@ -733,3 +735,116 @@ async def mark_message_as_read(
         await db.commit()
 
     return {"message": "Message marked as read", "read_at": message.read_at.isoformat()}
+
+
+# ============== Maintenance Notification Endpoints / 维护通知端点 ==============
+
+
+class MaintenanceNotificationRequest(BaseModel):
+    """Maintenance notification request / 维护通知请求"""
+
+    maintenance_time: str
+    maintenance_content: Optional[str] = None
+
+
+@router.post("/admin/maintenance-notification", response_model=Dict[str, Any])
+async def send_maintenance_notification(
+    request: MaintenanceNotificationRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Send maintenance notification to all users / 发送维护通知给所有用户
+
+    Admins can send maintenance notification emails to all registered patients and doctors.
+    管理员可以向所有注册的患者和医生发送系统维护通知邮件。
+    """
+    # Check if user is admin
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can send maintenance notifications",
+        )
+
+    # Validate maintenance_time
+    if not request.maintenance_time or len(request.maintenance_time.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maintenance time is required",
+        )
+
+    maintenance_time = request.maintenance_time.strip()
+    maintenance_content = (
+        request.maintenance_content.strip() if request.maintenance_content else None
+    )
+
+    # Get all patients and doctors (exclude admins)
+    stmt = select(User).where(or_(User.role == "patient", User.role == "doctor"))
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+
+    if not users:
+        return {
+            "message": "No users found to notify",
+            "total_users": 0,
+            "success_count": 0,
+            "failed_count": 0,
+        }
+
+    # Send emails to all users
+    success_count = 0
+    failed_count = 0
+    failed_emails = []
+
+    for user in users:
+        try:
+            email_sent = await send_maintenance_notification_email(
+                to_email=user.email,
+                user_name=user.full_name,
+                maintenance_time=maintenance_time,
+                maintenance_content=maintenance_content or "",
+            )
+            if email_sent:
+                success_count += 1
+            else:
+                failed_count += 1
+                failed_emails.append(user.email)
+        except Exception as e:
+            logger.error(
+                f"Failed to send maintenance notification to {user.email}: {e}"
+            )
+            failed_count += 1
+            failed_emails.append(user.email)
+
+    # Log operation
+    try:
+        admin_logger = AdminOperationLogger(db)
+        await admin_logger.log_operation(
+            admin_id=current_user.id,
+            operation_type="data_export",
+            operation_details={
+                "action": "send_maintenance_notification",
+                "maintenance_time": maintenance_time,
+                "maintenance_content": maintenance_content,
+                "total_users": len(users),
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "failed_emails": failed_emails,
+            },
+            ip_address="",
+        )
+    except Exception as log_error:
+        logger.warning(f"Failed to log maintenance notification operation: {log_error}")
+
+    logger.info(
+        f"Admin {current_user.id} sent maintenance notification to {len(users)} users. "
+        f"Success: {success_count}, Failed: {failed_count}"
+    )
+
+    return {
+        "message": "Maintenance notification sent successfully",
+        "total_users": len(users),
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "failed_emails": failed_emails if failed_emails else None,
+    }

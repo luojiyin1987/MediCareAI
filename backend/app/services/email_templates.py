@@ -3,6 +3,7 @@ Email Templates | 邮件模板
 
 提供各类邮件的HTML和文本模板
 """
+
 from string import Template
 import logging
 
@@ -200,7 +201,6 @@ async def send_patient_registration_email(
     return success
 
 
-
 # =============================================================================
 # 医生注册待审核通知邮件 | Doctor Registration Pending Email
 # =============================================================================
@@ -332,12 +332,13 @@ async def send_doctor_pending_email(to_email: str, doctor_name: str) -> bool:
     return success
 
 
-
 # =============================================================================
 # 医生审核拒绝通知邮件 | Doctor Rejection Email
 # =============================================================================
 
-DOCTOR_REJECTION_SUBJECT = "【MediCareAI】医生注册审核未通过 - Doctor Registration Rejected"
+DOCTOR_REJECTION_SUBJECT = (
+    "【MediCareAI】医生注册审核未通过 - Doctor Registration Rejected"
+)
 
 DOCTOR_REJECTION_HTML = Template("""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -470,11 +471,17 @@ MediCareAI 智能疾病管理系统
 本邮件由系统自动发送，请勿直接回复""")
 
 
-async def send_doctor_rejection_email(to_email: str, doctor_name: str, rejection_reason: str) -> bool:
-    
-    html_content = DOCTOR_REJECTION_HTML.substitute(doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因")
-    text_content = DOCTOR_REJECTION_TEXT.substitute(doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因")
-    
+async def send_doctor_rejection_email(
+    to_email: str, doctor_name: str, rejection_reason: str
+) -> bool:
+
+    html_content = DOCTOR_REJECTION_HTML.substitute(
+        doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因"
+    )
+    text_content = DOCTOR_REJECTION_TEXT.substitute(
+        doctor_name=doctor_name, rejection_reason=rejection_reason or "未提供具体原因"
+    )
+
     logger.info(f"正在发送医生审核拒绝邮件到 {to_email}")
     success, error_msg = await temail_service.send_email(
         to_email=to_email,
@@ -482,12 +489,11 @@ async def send_doctor_rejection_email(to_email: str, doctor_name: str, rejection
         html_content=html_content,
         text_content=text_content,
     )
-    
+
     if not success:
         logger.error(f"医生审核拒绝邮件发送失败: {error_msg}")
-    
-    return success
 
+    return success
 
 
 # =============================================================================
@@ -614,10 +620,16 @@ MediCareAI 智能疾病管理系统
 """)
 
 
-async def send_doctor_approval_email(to_email: str, doctor_name: str, login_url: str) -> bool:
+async def send_doctor_approval_email(
+    to_email: str, doctor_name: str, login_url: str
+) -> bool:
 
-    html_content = DOCTOR_APPROVAL_HTML.substitute(doctor_name=doctor_name, login_url=login_url)
-    text_content = DOCTOR_APPROVAL_TEXT.substitute(doctor_name=doctor_name, login_url=login_url)
+    html_content = DOCTOR_APPROVAL_HTML.substitute(
+        doctor_name=doctor_name, login_url=login_url
+    )
+    text_content = DOCTOR_APPROVAL_TEXT.substitute(
+        doctor_name=doctor_name, login_url=login_url
+    )
 
     logger.info(f"正在发送医生审核通过邮件到 {to_email}")
     success, error_msg = await temail_service.send_email(
@@ -626,17 +638,18 @@ async def send_doctor_approval_email(to_email: str, doctor_name: str, login_url:
         html_content=html_content,
         text_content=text_content,
     )
-    
+
     if not success:
         logger.error(f"医生审核通过邮件发送失败: {error_msg}")
-    
 
 
 # =============================================================================
 # 医生认证撤销通知邮件 | Doctor Revocation Email
 # =============================================================================
 
-DOCTOR_REVOCATION_SUBJECT = "【MediCareAI】医生认证已被撤销 - Doctor Certification Revoked"
+DOCTOR_REVOCATION_SUBJECT = (
+    "【MediCareAI】医生认证已被撤销 - Doctor Certification Revoked"
+)
 
 DOCTOR_REVOCATION_HTML = Template("""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -761,7 +774,9 @@ MediCareAI 智能疾病管理系统
 # 医生认证恢复通知邮件 | Doctor Re-approval Email
 # =============================================================================
 
-DOCTOR_REAPPROVAL_SUBJECT = "【MediCareAI】医生认证已恢复 - Doctor Certification Restored"
+DOCTOR_REAPPROVAL_SUBJECT = (
+    "【MediCareAI】医生认证已恢复 - Doctor Certification Restored"
+)
 
 DOCTOR_REAPPROVAL_HTML = Template("""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -905,11 +920,17 @@ MediCareAI 智能疾病管理系统
 """)
 
 
-async def send_doctor_revocation_email(to_email: str, doctor_name: str, reason: str) -> bool:
-    
-    html_content = DOCTOR_REVOCATION_HTML.substitute(doctor_name=doctor_name, reason=reason or "未提供具体原因")
-    text_content = DOCTOR_REVOCATION_TEXT.substitute(doctor_name=doctor_name, reason=reason or "未提供具体原因")
-    
+async def send_doctor_revocation_email(
+    to_email: str, doctor_name: str, reason: str
+) -> bool:
+
+    html_content = DOCTOR_REVOCATION_HTML.substitute(
+        doctor_name=doctor_name, reason=reason or "未提供具体原因"
+    )
+    text_content = DOCTOR_REVOCATION_TEXT.substitute(
+        doctor_name=doctor_name, reason=reason or "未提供具体原因"
+    )
+
     logger.info(f"正在发送医生认证撤销邮件到 {to_email}")
     success, error_msg = await temail_service.send_email(
         to_email=to_email,
@@ -917,15 +938,17 @@ async def send_doctor_revocation_email(to_email: str, doctor_name: str, reason: 
         html_content=html_content,
         text_content=text_content,
     )
-    
+
     if not success:
         logger.error(f"医生认证撤销邮件发送失败: {error_msg}")
-    
+
     return success
 
 
-async def send_doctor_reapproval_email(to_email: str, doctor_name: str, login_url: str, notes: str = None) -> bool:
-    
+async def send_doctor_reapproval_email(
+    to_email: str, doctor_name: str, login_url: str, notes: str = None
+) -> bool:
+
     # 处理备注信息显示
     if notes:
         notes_section = f'<div class="notes"><div class="notes-label">管理员备注：</div><div>{notes}</div></div>'
@@ -933,10 +956,14 @@ async def send_doctor_reapproval_email(to_email: str, doctor_name: str, login_ur
     else:
         notes_section = ""
         notes_text = ""
-    
-    html_content = DOCTOR_REAPPROVAL_HTML.substitute(doctor_name=doctor_name, login_url=login_url, notes_section=notes_section)
-    text_content = DOCTOR_REAPPROVAL_TEXT.substitute(doctor_name=doctor_name, login_url=login_url, notes_text=notes_text)
-    
+
+    html_content = DOCTOR_REAPPROVAL_HTML.substitute(
+        doctor_name=doctor_name, login_url=login_url, notes_section=notes_section
+    )
+    text_content = DOCTOR_REAPPROVAL_TEXT.substitute(
+        doctor_name=doctor_name, login_url=login_url, notes_text=notes_text
+    )
+
     logger.info(f"正在发送医生认证恢复邮件到 {to_email}")
     success, error_msg = await temail_service.send_email(
         to_email=to_email,
@@ -944,8 +971,186 @@ async def send_doctor_reapproval_email(to_email: str, doctor_name: str, login_ur
         html_content=html_content,
         text_content=text_content,
     )
-    
+
     if not success:
         logger.error(f"医生认证恢复邮件发送失败: {error_msg}")
-    
+
+    return success
+
+
+# =============================================================================
+# 系统维护通知邮件 | System Maintenance Notification Email
+# =============================================================================
+
+MAINTENANCE_NOTIFICATION_SUBJECT = "【MediCareAI】系统维护通知"
+
+MAINTENANCE_NOTIFICATION_HTML = Template("""
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统维护通知 - MediCareAI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.9; }
+        .content { padding: 40px 30px; }
+        .welcome { font-size: 20px; color: #333; margin-bottom: 20px; }
+        .message {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #ffc107;
+        }
+        .message strong { color: #856404; }
+        .info-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-box p { margin: 8px 0; font-size: 14px; }
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #ddd, transparent);
+            margin: 30px 0;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+        .footer p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 系统维护通知</h1>
+            <p>MediCareAI 智能疾病管理系统</p>
+        </div>
+
+        <div class="content">
+            <h2 class="welcome">您好，$user_name！</h2>
+
+            <div class="message">
+                <p><strong>我们即将进行系统维护，届时服务可能暂时不可用。</strong></p>
+                <p style="margin-top: 10px;">为了给您提供更好的服务体验，我们需要对系统进行例行维护和升级。</p>
+            </div>
+
+            <div class="info-box">
+                <div class="info-label">⏰ 维护时间</div>
+                <p>$maintenance_time</p>
+            </div>
+
+            $maintenance_content_section
+
+            <div class="divider"></div>
+
+            <div style="color: #666; font-size: 14px; line-height: 1.8;">
+                <p>对于维护期间给您带来的不便，我们深表歉意。感谢您的理解与支持！</p>
+                <p style="margin-top: 15px;">如有紧急需求，请在维护开始前或结束后使用系统。</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>MediCareAI 智能疾病管理系统</strong></p>
+            <p>本邮件由系统自动发送，请勿直接回复</p>
+            <p style="margin-top: 10px; color: #999;">© 2024 MediCareAI. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+""")
+
+MAINTENANCE_NOTIFICATION_TEXT = Template("""
+系统维护通知 - MediCareAI
+
+您好，$user_name！
+
+我们即将进行系统维护，届时服务可能暂时不可用。
+
+为了给您提供更好的服务体验，我们需要对系统进行例行维护和升级。
+
+维护时间：
+$maintenance_time
+
+$maintenance_content_text
+
+对于维护期间给您带来的不便，我们深表歉意。感谢您的理解与支持！
+
+如有紧急需求，请在维护开始前或结束后使用系统。
+
+MediCareAI 智能疾病管理系统
+本邮件由系统自动发送，请勿直接回复
+""")
+
+
+async def send_maintenance_notification_email(
+    to_email: str,
+    user_name: str,
+    maintenance_time: str,
+    maintenance_content: str = "",
+) -> bool:
+
+    # 处理维护内容显示
+    if maintenance_content:
+        maintenance_content_section = f"""<div class="info-box">
+            <div class="info-label">📝 维护内容</div>
+            <p>{maintenance_content}</p>
+        </div>"""
+        maintenance_content_text = f"维护内容：\n{maintenance_content}\n"
+    else:
+        maintenance_content_section = ""
+        maintenance_content_text = ""
+
+    html_content = MAINTENANCE_NOTIFICATION_HTML.substitute(
+        user_name=user_name,
+        maintenance_time=maintenance_time,
+        maintenance_content_section=maintenance_content_section,
+    )
+    text_content = MAINTENANCE_NOTIFICATION_TEXT.substitute(
+        user_name=user_name,
+        maintenance_time=maintenance_time,
+        maintenance_content_text=maintenance_content_text,
+    )
+
+    logger.info(f"正在发送系统维护通知邮件到 {to_email}")
+    success, error_msg = await temail_service.send_email(
+        to_email=to_email,
+        subject=MAINTENANCE_NOTIFICATION_SUBJECT,
+        html_content=html_content,
+        text_content=text_content,
+    )
+
+    if not success:
+        logger.error(f"系统维护通知邮件发送失败: {error_msg}")
+
     return success

@@ -27,6 +27,7 @@ import {
   Person as PersonIcon,
   Send as SendIcon,
   Reply as ReplyIcon,
+  Build as BuildIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -55,11 +56,26 @@ interface InternalMessage {
   }[];
 }
 
+// 维护通知响应类型定义
+interface MaintenanceNotificationResponse {
+  message: string;
+  total_users: number;
+  success_count: number;
+  failed_count: number;
+}
+
 const AdminMessages: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedMessage, setSelectedMessage] = useState<InternalMessage | null>(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [replyContent, setReplyContent] = useState('');
+
+  // ==================== 维护通知功能状态 ====================
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [maintenanceTime, setMaintenanceTime] = useState('');
+  const [maintenanceContent, setMaintenanceContent] = useState('');
+  const [maintenanceResult, setMaintenanceResult] = useState<MaintenanceNotificationResponse | null>(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
   // Fetch messages
   const {
@@ -148,6 +164,32 @@ const AdminMessages: React.FC = () => {
     },
   });
 
+  // 维护通知发送Mutation
+  const maintenanceMutation = useMutation<MaintenanceNotificationResponse, Error, { maintenance_time: string; maintenance_content?: string }>({
+    mutationFn: async (data) => {
+      const response = await fetch(buildApiUrl('admin/maintenance-notification'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem(CONFIG.TOKEN_KEY)}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: '发送维护通知失败' }));
+        throw new Error(errorData.detail || '发送维护通知失败');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setMaintenanceResult(data);
+      setShowSuccessAlert(true);
+      setMaintenanceDialogOpen(false);
+      setMaintenanceTime('');
+      setMaintenanceContent('');
+    },
+  });
+
   const handleReply = () => {
     if (selectedMessage && replyContent.trim()) {
       replyMutation.mutate({ messageId: selectedMessage.id, content: replyContent });
@@ -173,19 +215,48 @@ const AdminMessages: React.FC = () => {
     );
   }
 
+  // 发送维护通知处理函数
+  const handleSendMaintenance = () => {
+    if (maintenanceTime.trim()) {
+      maintenanceMutation.mutate({
+        maintenance_time: maintenanceTime.trim(),
+        maintenance_content: maintenanceContent.trim() || undefined,
+      });
+    }
+  };
+
+  // 关闭维护通知对话框
+  const handleCloseMaintenanceDialog = () => {
+    if (!maintenanceMutation.isPending) {
+      setMaintenanceDialogOpen(false);
+      setMaintenanceTime('');
+      setMaintenanceContent('');
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        站内信管理
-        {unreadCount > 0 && (
-          <Chip
-            label={`${unreadCount} 条未读`}
-            color="error"
-            size="small"
-            sx={{ ml: 2 }}
-          />
-        )}
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4">
+          站内信管理
+          {unreadCount > 0 && (
+            <Chip
+              label={`${unreadCount} 条未读`}
+              color="error"
+              size="small"
+              sx={{ ml: 2 }}
+            />
+          )}
+        </Typography>
+        <Button
+          variant="contained"
+          color="warning"
+          startIcon={<BuildIcon />}
+          onClick={() => setMaintenanceDialogOpen(true)}
+        >
+          发送维护通知
+        </Button>
+      </Box>
 
       <Box display="flex" gap={2} mt={3}>
         {/* Message List */}
@@ -367,6 +438,70 @@ const AdminMessages: React.FC = () => {
             disabled={!replyContent.trim() || replyMutation.isPending}
           >
             {replyMutation.isPending ? '发送中...' : '发送回复'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 维护通知对话框 */}
+      <Dialog
+        open={maintenanceDialogOpen}
+        onClose={handleCloseMaintenanceDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>发送系统维护通知</DialogTitle>
+        <DialogContent>
+          {showSuccessAlert && maintenanceResult && (
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setShowSuccessAlert(false)}>
+              {maintenanceResult.message}
+              <Box mt={1}>
+                <Typography variant="body2">
+                  总用户数: {maintenanceResult.total_users} | 发送成功: {maintenanceResult.success_count} | 发送失败: {maintenanceResult.failed_count}
+                </Typography>
+              </Box>
+            </Alert>
+          )}
+          {maintenanceMutation.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {maintenanceMutation.error.message}
+            </Alert>
+          )}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            此功能将向所有用户发送系统维护通知消息。
+          </Typography>
+          <TextField
+            label="维护时间段"
+            required
+            fullWidth
+            value={maintenanceTime}
+            onChange={(e) => setMaintenanceTime(e.target.value)}
+            placeholder="例如：2026年4月1日 02:00 - 06:00"
+            sx={{ mb: 2 }}
+            disabled={maintenanceMutation.isPending}
+          />
+          <TextField
+            label="维护内容说明"
+            multiline
+            rows={4}
+            fullWidth
+            value={maintenanceContent}
+            onChange={(e) => setMaintenanceContent(e.target.value)}
+            placeholder="请输入维护内容说明（可选）"
+            disabled={maintenanceMutation.isPending}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMaintenanceDialog} disabled={maintenanceMutation.isPending}>
+            取消
+          </Button>
+          <Button
+            onClick={handleSendMaintenance}
+            variant="contained"
+            color="warning"
+            startIcon={<SendIcon />}
+            disabled={!maintenanceTime.trim() || maintenanceMutation.isPending}
+          >
+            {maintenanceMutation.isPending ? '发送中...' : '发送通知'}
           </Button>
         </DialogActions>
       </Dialog>
